@@ -23,6 +23,8 @@ Executes a complete, sequential 19-step business workflow:
 19. Verify destructive SQL is rejected
 """
 
+import sqlite3
+
 import pytest
 from django.contrib.auth import get_user_model
 from rest_framework import status
@@ -31,6 +33,79 @@ from rest_framework.test import APIClient
 from apps.analytics.models import Customer, Order, OrderItem, Product
 
 User = get_user_model()
+
+
+@pytest.fixture
+def e2e_sqlite_db(tmp_path):
+    """Create a temporary, self-contained SQLite business database for E2E datasource testing."""
+    db_file = tmp_path / "e2e_operational.sqlite3"
+    conn = sqlite3.connect(str(db_file))
+    cur = conn.cursor()
+
+    cur.executescript("""
+        CREATE TABLE customers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            email TEXT NOT NULL,
+            customer_segment TEXT NOT NULL,
+            country TEXT NOT NULL,
+            signup_date TEXT NOT NULL
+        );
+
+        CREATE TABLE products (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            category TEXT NOT NULL,
+            price REAL NOT NULL,
+            cost REAL NOT NULL
+        );
+
+        CREATE TABLE orders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            customer_id INTEGER NOT NULL REFERENCES customers(id),
+            order_date TEXT NOT NULL,
+            status TEXT NOT NULL,
+            total_amount REAL NOT NULL
+        );
+
+        CREATE TABLE order_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            order_id INTEGER NOT NULL REFERENCES orders(id),
+            product_id INTEGER NOT NULL REFERENCES products(id),
+            quantity INTEGER NOT NULL,
+            unit_price REAL NOT NULL,
+            subtotal REAL NOT NULL
+        );
+
+        INSERT INTO customers (id, name, email, customer_segment, country, signup_date) VALUES
+            (1, 'Customer 1', 'customer1@example.com', 'SMB', 'USA', '2026-01-01'),
+            (2, 'Customer 2', 'customer2@example.com', 'ENTERPRISE', 'USA', '2026-01-01'),
+            (3, 'Customer 3', 'customer3@example.com', 'SMB', 'USA', '2026-01-01'),
+            (4, 'Customer 4', 'customer4@example.com', 'ENTERPRISE', 'USA', '2026-01-01');
+
+        INSERT INTO products (id, name, category, price, cost) VALUES
+            (1, 'Analytics Pro', 'Software', 500.0, 100.0),
+            (2, 'Cloud Storage', 'Infrastructure', 250.0, 50.0);
+
+        INSERT INTO orders (id, customer_id, order_date, status, total_amount) VALUES
+            (1, 1, '2026-01-10T12:00:00Z', 'COMPLETED', 750.0),
+            (2, 2, '2026-01-10T12:00:00Z', 'COMPLETED', 750.0),
+            (3, 3, '2026-02-10T12:00:00Z', 'COMPLETED', 750.0),
+            (4, 4, '2026-02-10T12:00:00Z', 'COMPLETED', 750.0);
+
+        INSERT INTO order_items (order_id, product_id, quantity, unit_price, subtotal) VALUES
+            (1, 1, 1, 500.0, 500.0),
+            (1, 2, 1, 250.0, 250.0),
+            (2, 1, 1, 500.0, 500.0),
+            (2, 2, 1, 250.0, 250.0),
+            (3, 1, 1, 500.0, 500.0),
+            (3, 2, 1, 250.0, 250.0),
+            (4, 1, 1, 500.0, 500.0),
+            (4, 2, 1, 250.0, 250.0);
+    """)
+    conn.commit()
+    conn.close()
+    return str(db_file)
 
 
 @pytest.fixture
@@ -69,7 +144,7 @@ def seed_business_data(db):
 class TestEndToEndAcceptancePipeline:
     """Complete 19-step acceptance test covering the entire AI Database Assistant stack."""
 
-    def test_complete_business_flow_19_steps(self, seed_business_data):
+    def test_complete_business_flow_19_steps(self, seed_business_data, e2e_sqlite_db):
         client = APIClient()
         client.defaults["HTTP_HOST"] = "127.0.0.1"
 
@@ -103,18 +178,15 @@ class TestEndToEndAcceptancePipeline:
         assert user.is_authenticated
 
         # -------------------------------------------------------------
-        # Step 2: Add Database Data Source (SQLite demo database)
+        # Step 2: Add Database Data Source (Self-contained SQLite demo database)
         # -------------------------------------------------------------
-        from django.conf import settings
-
-        db_path = str(settings.BASE_DIR / "db.sqlite3")
         ds_res = client.post(
             "/api/datasources/",
             {
                 "name": "Production Operational DB",
                 "description": "Primary transactional SQLite database",
                 "engine": "sqlite",
-                "database_name": db_path,
+                "database_name": e2e_sqlite_db,
                 "is_active": True,
             },
             format="json",
