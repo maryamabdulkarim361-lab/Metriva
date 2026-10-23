@@ -1,0 +1,60 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: aidb_postgres
+    environment:
+      POSTGRES_DB: aidb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d aidb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: aidb_backend
+    environment:
+      DEBUG: "True"
+      SECRET_KEY: "django-insecure-docker-dev-key-change-in-production"
+      DATABASE_URL: "postgresql://postgres:postgrespassword@postgres:5432/aidb"
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+      OPENAI_MODEL: "${OPENAI_MODEL:-gpt-4o-mini}"
+      MAX_ROWS: "1000"
+      MAX_QUERY_SECONDS: "10"
+      MAX_SQL_LENGTH: "10000"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py seed_database --scale demo --seed 42 &&
+             python manage.py runserver 0.0.0.0:8000"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: aidb_frontend
+    ports:
+      - "5173:5173"
+    environment:
+      BACKEND_URL: "http://backend:8000"
+      VITE_BACKEND_URL: "http://backend:8000"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
+

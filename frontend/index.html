@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none'><path d='M4 19V6L12 14L20 6V19' stroke='%2322d3ee' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/><circle cx='12' cy='14' r='2.5' fill='%2306b6d4'/></svg>" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Metriva — Turn Business Data Into Clarity | AI-Powered Business Intelligence</title>
+    <meta name="description" content="Metriva is the autonomous AI business intelligence platform for non-technical businesses. Ask plain-English questions, get instant SQL-validated answers, executive charts, and ML predictions." />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <script>
+      (function() {
+        try {
+          var saved = localStorage.getItem("metriva_theme");
+          var prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+          if (saved === "dark" || (!saved && prefersDark) || (saved === "system" && prefersDark)) {
+            document.documentElement.classList.add("dark");
+            document.documentElement.style.colorScheme = "dark";
+          } else if (saved === "light" || (saved === "system" && !prefersDark)) {
+            document.documentElement.classList.remove("dark");
+            document.documentElement.classList.add("light");
+            document.documentElement.style.colorScheme = "light";
+          } else {
+            document.documentElement.classList.add("dark");
+            document.documentElement.style.colorScheme = "dark";
+          }
+        } catch (e) {
+          document.documentElement.classList.add("dark");
+        }
+      })();
+    </script>
+  </head>
+  <body class="bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 antialiased font-sans min-h-screen selection:bg-cyan-500 selection:text-slate-950 transition-colors duration-200">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
