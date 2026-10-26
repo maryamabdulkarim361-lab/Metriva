@@ -1,6 +1,6 @@
 # Metriva
 
-> Enterprise-grade conversational business intelligence, predictive machine learning, multi-tenant RBAC, and column-level data protection for PostgreSQL, MySQL, and SQLite.
+> Enterprise-ready conversational business intelligence, predictive machine learning, multi-tenant RBAC, and column-level data protection for PostgreSQL, MySQL, and SQLite.
 
 [![CI](https://github.com/maryamabdulkarim361-lab/Metriva/actions/workflows/tests.yml/badge.svg)](https://github.com/maryamabdulkarim361-lab/Metriva/actions/workflows/tests.yml)
 [![Python](https://img.shields.io/badge/Python-3.14%20%7C%203.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
@@ -10,10 +10,10 @@
 [![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-5-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
-[![Backend Tests](https://img.shields.io/badge/Pytest-184%20Passed%20(100%25)-success?logo=pytest&logoColor=white)](#5-testing--verification)
-[![Frontend Tests](https://img.shields.io/badge/Vitest-47%20Passed%20(100%25)-success?logo=vitest&logoColor=white)](#5-testing--verification)
-[![Security Hardened](https://img.shields.io/badge/Security-16%20Hardening%20Checks-blue)](#security--defense-in-depth)
-[![License](https://img.shields.io/badge/License-BSL%201.1-blue)](LICENSE)
+[![Unique Automated Tests](https://img.shields.io/badge/Automated%20Tests-231%20Unique%20Passed-success?logo=githubactions&logoColor=white)](#5-testing--verification)
+[![Backend Tests](https://img.shields.io/badge/Pytest-184%20Passed-success?logo=pytest&logoColor=white)](#5-testing--verification)
+[![Frontend Tests](https://img.shields.io/badge/Vitest-47%20Passed-success?logo=vitest&logoColor=white)](#5-testing--verification)
+[![License](https://img.shields.io/badge/License-BSL%201.1%20(Source--Available)-blue)](LICENSE)
 
 ---
 
@@ -23,7 +23,7 @@
 
 Unlike naive text-to-SQL prototypes that stream raw LLM output into unconstrained database connections, Metriva establishes a robust defense-in-depth boundary:
 - **Enterprise Multi-Tenant RBAC:** Granular role enforcement (`ADMIN`, `ANALYST`, `VIEWER`) with organization-scoped data isolation across database connections, query histories, saved reports, and ML jobs.
-- **Dynamic Column-Level Data Masking:** Automated redaction of sensitive business fields (emails, phone numbers, account identifiers, monetary values) with AST-level inference guards blocking filter or sort-based data leakage.
+- **Dynamic Column-Level Data Masking:** Automated redaction of sensitive business fields (emails, phone numbers, account identifiers, monetary values) paired with AST-level query guards that intercept filter- or sort-based side-channel leakage vectors.
 - **SQL Abstract Syntax Tree (AST) Security:** Lexical token validation, read-only transaction clamping (`SET TRANSACTION READ ONLY`), statement timeouts, and schema allowlists blocking DDL/DML, multi-statement injection, and SSRF attacks.
 - **Multi-Engine Relational Data Access:** Unified connection pooling and schema introspection across PostgreSQL 16, MySQL 8.4 LTS, and SQLite 3.
 - **Predictive Machine Learning:** In-database statistical Holt-Winters time-series forecasting, leak-free RFM churn classification, and Tukey IQR / rolling Z-score anomaly detection.
@@ -34,11 +34,11 @@ To maintain complete engineering transparency, Metriva documents verified operat
 
 | Dimension | Verified & Tested Status | Scope & Operational Boundary |
 | :--- | :--- | :--- |
-| **Enterprise RBAC & Tenancy** | ✅ **100% Tested** (Unit & Integration) | Strict server-side tenancy clamping, 3-tier role hierarchy (`ADMIN`, `ANALYST`, `VIEWER`), immediate membership revocation, and zero cross-tenant leakage. |
-| **Column Masking & AST Guard** | ✅ **100% Tested** (Unit & Integration) | Policy-driven dynamic regex masking (`mask_email`, `mask_phone`, `mask_partial_account`, `nullify`) and AST parser rejection of sensitive column inference attacks (`WHERE`, `ORDER BY`, `GROUP BY`). |
+| **Enterprise RBAC & Tenancy** | ✅ **100% Tested** (23 Tests) | Strict server-side tenancy clamping, 3-tier role hierarchy (`ADMIN`, `ANALYST`, `VIEWER`), immediate membership revocation, and zero cross-tenant leakage. |
+| **Column Masking & AST Guard** | ✅ **100% Tested** (Unit & Integration) | Policy-driven dynamic regex masking (`mask_email`, `mask_phone`, `mask_partial_account`, `nullify`) and AST parser rejection of sensitive column predicates in `WHERE`, `ORDER BY`, and `GROUP BY`. |
 | **AST SQL Security Engine** | ✅ **100% Tested** (16 Security Checks) | Strict AST token validation, DDL/DML blocking, schema allowlists, transaction clamping (`READ ONLY`), and statement timeout injection. |
-| **Internal PostgreSQL Demo DB** | ✅ **Live Verified** (PostgreSQL 16) | Migrations, deterministic seed dataset (2,500 orders, 250 customers across 10 countries), connection pooling, and multi-tenant isolation. |
-| **External MySQL Integration** | ✅ **Live Verified** (MySQL 8.4 LTS) | Dedicated containerized MySQL 8.4 service, synthetic supply chain dataset (10 suppliers, 12 inventory SKUs, 10 shipments), least-privilege read-only user (`metriva_readonly`), AST validation, and RFC 4180 CSV export. |
+| **Internal PostgreSQL Demo DB** | ✅ **Live Verified** (PostgreSQL 16) | Migrations, deterministic synthetic seed dataset (2,500 orders, 250 customers across 10 countries), connection pooling, and multi-tenant isolation. |
+| **External MySQL Integration** | ✅ **Live Verified** (12 Live Tests) | Dedicated containerized MySQL 8.4 service, synthetic supply chain dataset (10 suppliers, 12 inventory SKUs, 10 shipments), least-privilege read-only user (`metriva_readonly`), AST validation, and RFC 4180 CSV export. |
 | **External SQLite Datasource** | ✅ **Live Verified** (B2B SaaS Dataset) | External SQLite file attachment (15 enterprise SaaS accounts, 15 subscriptions, 13 invoices), schema introspection, AST-validated Direct SQL execution, and CSV export. |
 | **BI & Predictive ML** | ✅ **100% Tested** (Unit & Integration) | Statistical Holt-Winters forecasting, leak-free RFM churn scoring, Tukey IQR / rolling Z-score anomalies, and automated chart recommendations. |
 | **Dual-Theme Design System** | ✅ **100% Tested** (47 Vitest Tests) | 60 FPS HTML5 canvas animated hero, responsive light/dark themes, zero-FOUC initialization, and accessible reduced-motion support. |
@@ -115,13 +115,13 @@ flowchart TB
 - **Server-Side Tenant Clamping**: All database queries, query histories, saved reports, database credentials, and ML runs are scoped to the authenticated user's active organization. Cross-organization access is strictly rejected at the ORM layer.
 - **Immediate Role Revocation**: Revoking membership or downgrading roles invalidates access tokens and session context immediately without stale permission caching.
 
-### 🛡️ Dynamic Column-Level Data Masking & AST Inference Defense
+### 🛡️ Dynamic Column-Level Data Masking & AST Inference Mitigation
 - **Dynamic Response Masking**: Sensitive customer and corporate fields are automatically masked based on active organization policies:
   - `mask_email`: `j***e@domain.com` (preserves domain structure while concealing identity)
   - `mask_phone`: `***-***-1234` (preserves terminal digits for reconciliation)
   - `mask_partial_account`: `****-5678` (protects credit cards, account numbers, and SSNs)
   - `nullify`: Returns `NULL` for unauthorized financial or salary figures
-- **AST-Level Inference Attack Prevention**: Naive masking often exposes sensitive data to statistical extraction via query filters or sorting. Metriva's `SQLValidator` inspects the query Abstract Syntax Tree to block masked columns inside `WHERE`, `ON`, `HAVING`, `ORDER BY`, and `GROUP BY` clauses for non-Admin users, preventing binary search and side-channel inference.
+- **AST-Level Inference Mitigation**: Naive column masking often exposes sensitive values to statistical extraction via query filters or ordering. Metriva's `SQLValidator` inspects the query Abstract Syntax Tree using `sqlparse` to intercept and reject queries where non-Admin users reference masked columns inside `WHERE`, `ON`, `HAVING`, `ORDER BY`, or `GROUP BY` clauses, mitigating binary-search and side-channel inference vectors.
 
 ### 🌐 Multi-Engine Relational Data Access
 - **PostgreSQL 16**: Primary internal transactional database and external analytics target with connection pooling and schema introspection.
@@ -133,6 +133,7 @@ flowchart TB
 - **Dual Query Modalities**:
   - *Conversational Mode*: Translates natural language questions (*"What was our monthly churn in Q3?"*, *"Show top 10 enterprise accounts by MRR"*) into syntactically valid ANSI/PostgreSQL/MySQL SQL.
   - *Direct SQL Mode*: Engineers and analysts can author and run raw SQL against any connected database with full preservation of custom projections, joins, and row limits.
+- **Deterministic Mock Provider**: Includes a built-in offline mock provider mapping canonical analytical questions to schema queries with zero external network traffic or API cost.
 - **Query Result Lifecycle & Export**: Execution state is strictly partitioned per execution; stale query buffers are wiped prior to execution. RFC 4180 compliant CSV exports stream real-time masked data directly to client sessions.
 
 ### 🎨 Dual-Theme Design System & 3D Animated Hero
@@ -166,19 +167,21 @@ flowchart TB
 
 ## 5. Testing & Verification
 
-The codebase has undergone automated testing across unit, integration, security, and live external service boundaries. All tests run in continuous integration on GitHub Actions:
+The codebase has undergone exhaustive automated testing across unit, integration, security, and live external service boundaries. All tests run in continuous integration on GitHub Actions:
 
-| Test Suite | Framework | Target / Focus | Passed | Status |
+| Test Suite | Framework | Target / Focus | Unique Tests | Status |
 | :--- | :--- | :--- | :---: | :---: |
-| **Backend Test Suite** | Pytest 9.1 | Models, Serializers, Views, RBAC, Multi-Tenancy, Data Masking | **172 / 172** | ✅ PASS |
-| **MySQL 8.4 Live Integration** | Pytest 9.1 | Genuine MySQL 8.4 Server, Schema Introspection, Read-Only User | **12 / 12** | ✅ PASS |
-| **Security Hardening** | Pytest 9.1 | SSRF, Path Traversal, AST Splitting, Tenant Isolation | **16 / 16** | ✅ PASS |
-| **Frontend Test Suite** | Vitest 2.1 | Components, Navigation, Query Studio, RBAC Guards, Masking UI | **47 / 47** | ✅ PASS |
+| **Backend Test Suite (Total)** | Pytest 9.1 | Comprehensive API, ORM, RBAC, AST, ML, and Datasource suites | **184 / 184** | ✅ PASS |
+| ↳ *RBAC & Data Protection* | Pytest 9.1 | Multi-tenant isolation, role hierarchy, dynamic masking | *23 / 23* | ✅ PASS |
+| ↳ *Security Hardening Suite* | Pytest 9.1 | SSRF, Path Traversal, AST Splitting, Wildcard & Permission Guards | *16 / 16* | ✅ PASS |
+| ↳ *MySQL 8.4 Live Integration* | Pytest 9.1 | Genuine MySQL 8.4 Server, Schema Introspection, Read-Only User | *12 / 12* | ✅ PASS |
+| ↳ *SQL AST Validator Suite* | Pytest 9.1 | Lexical token parsing, syntax sanitizing, DDL/DML blocking | *55 / 55* | ✅ PASS |
+| **Frontend Test Suite (Total)** | Vitest 2.1 | Components, Navigation, Query Studio, RBAC Guards, Masking UI | **47 / 47** | ✅ PASS |
 | **Python Linter** | Ruff | PEP 8, Import hygiene, Static analysis | **Clean (0 errors)** | ✅ PASS |
 | **TypeScript / Frontend Build** | TypeScript / Vite | Strict typechecking (`tsc`) and production bundle compilation | **Clean (0 errors)** | ✅ PASS |
 | **CI Workflow Pipeline** | GitHub Actions | Automated Ubuntu test runner with PostgreSQL & MySQL services | **100% Passing** | ✅ PASS |
 
-**Total Automated Tests:** **247 passing** across all backend, security, live integration, and frontend suites.
+**Unique Automated Tests:** **231 unique automated tests** (184 backend and 47 frontend), all passing (100%), with dedicated coverage for live MySQL 8.4 integration (12 tests) and security hardening (16 checks).
 
 ---
 
@@ -260,7 +263,7 @@ npm run dev
 > All demonstration datasets in PostgreSQL, MySQL, and SQLite are completely **synthetic**, generated deterministically for testing and evaluation. They contain zero real customer PII, corporate secrets, or actual financial records.
 
 ### A. Demo PostgreSQL Transactional Dataset
-Metriva includes a deterministic, production-scale synthetic seed command:
+Metriva includes a deterministic synthetic seed command:
 ```bash
 python backend/manage.py seed_database --scale standard
 ```
@@ -318,6 +321,7 @@ An external MySQL database initialized via `database/mysql/init_metriva_mysql.sq
 
 Metriva is released under the [Business Source License 1.1 (BSL 1.1)](LICENSE), Copyright © 2026 Maryam Abdul Karim.
 
+Metriva is **source-available** software under the Business Source License 1.1 (BSL 1.1), not an OSI-approved open source license:
 - **Non-Production & Evaluation:** You may freely copy, modify, redistribute, test, and evaluate Metriva for non-production purposes.
 - **Internal Business Use:** You are affirmatively licensed to use Metriva in production for your internal business operations and analytics.
 - **Commercial SaaS Restriction:** You may not use Metriva to provide a commercial managed service, hosted software-as-a-service (SaaS), or cloud database assistant to third parties.
