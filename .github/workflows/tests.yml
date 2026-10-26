@@ -26,6 +26,19 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: rootpassword
+          MYSQL_DATABASE: metriva_mysql_demo
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -u root -prootpassword"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -62,11 +75,30 @@ jobs:
         run: |
           python backend/manage.py seed_database --scale demo --seed 42 --clear
 
-      - name: Run Pytest Test Suite (149 Tests)
+      - name: Initialize MySQL Demo Database
+        run: |
+          python -c "
+          import pymysql
+          conn = pymysql.connect(host='127.0.0.1', port=3306, user='root', password='rootpassword', client_flag=pymysql.constants.CLIENT.MULTI_STATEMENTS)
+          with open('database/mysql/init_metriva_mysql.sql') as f:
+              sql = f.read()
+          with conn.cursor() as cursor:
+              cursor.execute(sql)
+          conn.commit()
+          conn.close()
+          print('MySQL demo database initialized successfully.')
+          "
+
+      - name: Run Pytest Test Suite (161 Tests)
         env:
           DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/aidb_test
           SECRET_KEY: ci-test-secret-key-32chars-min-length-required
           OPENAI_API_KEY: ""
+          MYSQL_TEST_HOST: 127.0.0.1
+          MYSQL_TEST_PORT: "3306"
+          MYSQL_TEST_USER: metriva_readonly
+          MYSQL_TEST_PASSWORD: readonly_secure_pass
+          MYSQL_TEST_DB: metriva_mysql_demo
         run: |
           pytest backend/tests/ -v
 

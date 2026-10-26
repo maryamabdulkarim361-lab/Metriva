@@ -16,6 +16,29 @@ services:
       timeout: 5s
       retries: 5
 
+  # External MySQL 8.4 service for multi-engine integration & live testing
+  # Run with: docker compose --profile mysql up
+  mysql:
+    image: mysql:8.4
+    container_name: aidb_mysql
+    profiles: ["mysql", "all"]
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-metriva_mysql_demo}
+    ports:
+      - "127.0.0.1:${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysqldata:/var/lib/mysql
+      - ./database/mysql/init_metriva_mysql.sql:/docker-entrypoint-initdb.d/init_metriva_mysql.sql:ro
+    healthcheck:
+      # Daemon liveness probe: verifies MySQL engine is running and accepting TCP connections (not application-level user auth)
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p\"$$MYSQL_ROOT_PASSWORD\" || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
   backend:
     build:
       context: .
@@ -57,4 +80,5 @@ services:
 
 volumes:
   pgdata:
+  mysqldata:
 

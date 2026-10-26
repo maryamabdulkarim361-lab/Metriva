@@ -8,7 +8,7 @@
 [![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-5-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
-[![Backend Tests](https://img.shields.io/badge/Pytest-149%20Passed%20(100%25)-success?logo=pytest&logoColor=white)](#testing--verification)
+[![Backend Tests](https://img.shields.io/badge/Pytest-161%20Passed%20(100%25)-success?logo=pytest&logoColor=white)](#testing--verification)
 [![Frontend Tests](https://img.shields.io/badge/Vitest-38%20Passed%20(100%25)-success?logo=vitest&logoColor=white)](#testing--verification)
 [![Security Hardened](https://img.shields.io/badge/Security-16%20Hardening%20Checks-blue)](#security--defense-in-depth)
 [![License](https://img.shields.io/badge/License-BSL%201.1-blue)](LICENSE)
@@ -32,7 +32,7 @@ To maintain engineering transparency, Metriva distinguishes between verified ope
 | **AST SQL Security Engine** | ✅ **100% Tested** (16 Security Checks) | Strict AST token validation, DDL/DML blocking, schema allowlists, transaction clamping (`READ ONLY`), and statement timeout injection. |
 | **Internal PostgreSQL Demo DB** | ✅ **Live Verified** (PostgreSQL 16) | Migrations, demo dataset seeding (2,500 orders, 250 customers across 10 countries), pooling, and multi-tenant isolation verified live. |
 | **External SQLite Datasource** | ✅ **Live Verified** (B2B SaaS Dataset) | External SQLite file attachment (15 enterprise SaaS accounts, 15 subscriptions, 13 invoices), schema introspection, AST-validated Direct SQL execution, and CSV export verified live. |
-| **External MySQL Support** | 🔄 **Implemented (Live Test Pending)** | Driver (PyMySQL), connection encryption, schema discovery models, and SQL dialect handling implemented; independent live external server integration testing is pending dedicated container/host provisioning. |
+| **External MySQL Support** | ✅ **Live Verified** (MySQL 8.4 LTS) | Dedicated MySQL 8.4 service container, synthetic supply chain dataset (10 suppliers, 12 inventory SKUs, 10 shipments), least-privilege read-only user (`metriva_readonly`), AST validation, and RFC 4180 CSV export verified live. |
 | **BI & Predictive ML** | ✅ **100% Tested** (Unit & Integration) | Statistical Holt-Winters forecasting, RFM churn scoring, Tukey IQR / rolling Z-score anomalies, and automated chart recommendations. |
 | **Dual-Theme Design System** | ✅ **100% Tested** (38 Vitest Tests) | 60 FPS HTML5 canvas animated hero, responsive light/dark themes, zero-FOUC initialization, and accessible reduced-motion support. |
 | **AI Text-to-SQL: Mock Mode** | 🧪 **Offline Deterministic Mock** | Maps canonical business inquiries (revenue, churn, orders, top accounts) to valid SQL with zero API keys or external network traffic. |
@@ -164,7 +164,7 @@ The codebase has undergone exhaustive testing across unit, integration, security
 
 | Test Suite | Framework | Target / Focus | Passed | Status |
 | :--- | :--- | :--- | :---: | :---: |
-| **Backend Suite** | Pytest 9.1 | Models, Serializers, Views, Validators, External DataSources, ML | **149 / 149** | ✅ PASS |
+| **Backend Suite** | Pytest 9.1 | Models, Serializers, Views, Validators, External DataSources (PostgreSQL, SQLite, MySQL 8.4), ML | **161 / 161** | ✅ PASS |
 | **Security Hardening** | Pytest 9.1 | SSRF, Path Traversal, AST Splitting, Tenant Isolation | **16 / 16** | ✅ PASS |
 | **E2E Acceptance** | Pytest 9.1 | Full 19-Step End-to-End Business Pipeline | **1 / 1** | ✅ PASS |
 | **Frontend Suite** | Vitest 2.1 | Metriva Design System, RTL Components, Landing, Connections, Query | **38 / 38** | ✅ PASS |
