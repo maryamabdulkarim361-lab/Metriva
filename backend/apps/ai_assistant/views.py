@@ -44,6 +44,19 @@ class NaturalLanguageQueryView(APIView):
         dry_run = serializer.validated_data.get("dry_run", False)
         data_source_id = serializer.validated_data.get("data_source_id")
 
+        org, role = None, None
+        if request.user and request.user.is_authenticated:
+            from apps.organizations.models import RoleChoices
+            from apps.organizations.service import resolve_tenant_context
+
+            org, role = resolve_tenant_context(request)
+            if org and role == RoleChoices.VIEWER and not request.user.is_staff:
+                return api_error(
+                    message="Arbitrary AI queries are restricted for Viewers. Please view pre-authorized dashboards and reports.",
+                    code="VIEWER_QUERY_RESTRICTED",
+                    status_code=status.HTTP_403_FORBIDDEN,
+                )
+
         datasource = None
         dialect = "postgresql"
         schema_context = None
@@ -58,10 +71,14 @@ class NaturalLanguageQueryView(APIView):
 
             ds_qs = DataSource.objects.filter(id=data_source_id, is_active=True)
             if request.user.is_authenticated:
-                if not request.user.is_staff:
+                if org:
+                    ds_qs = ds_qs.filter(
+                        Q(organization=org) | Q(organization__isnull=True, user=request.user)
+                    )
+                elif not request.user.is_staff:
                     ds_qs = ds_qs.filter(Q(user=request.user) | Q(user__isnull=True))
             else:
-                ds_qs = ds_qs.filter(user__isnull=True)
+                ds_qs = ds_qs.filter(user__isnull=True, organization__isnull=True)
 
             datasource = ds_qs.first()
             if not datasource:
@@ -103,16 +120,35 @@ class NaturalLanguageQueryView(APIView):
 
         # 2. Safety validation & limits enforcement
         validator = SQLValidator()
+        inference_cols = None
+        schema_cols = None
+        if role != "ADMIN" and org:
+            from apps.organizations.masking_service import DataMaskingService
+
+            policies = DataMaskingService.get_column_policy_map(org)
+            inference_cols = {
+                p.match_pattern.lower() for p in policies if p.match_type == "EXACT"
+            } | {"email", "phone"}
+            if datasource and datasource.cached_schema:
+                schema_cols = {
+                    t["name"].lower(): [c["name"].lower() for c in t.get("columns", [])]
+                    for t in datasource.cached_schema.get("tables", [])
+                }
+
         validation = validator.validate(
             raw_sql,
             allowed_tables=allowed_tables,
             dialect=dialect,
+            inference_restricted_columns=inference_cols,
+            schema_columns=schema_cols,
         )
 
         if not validation.is_valid:
             # Audit blocked attempt
             QueryHistory.objects.create(
                 user=request.user if request.user.is_authenticated else None,
+                organization=org,
+                datasource=datasource,
                 natural_language_question=question,
                 generated_sql=raw_sql,
                 execution_status=QueryStatus.BLOCKED,
@@ -151,6 +187,7 @@ class NaturalLanguageQueryView(APIView):
                 sql=sanitized_sql,
                 question=question,
                 user=request.user,
+                organization=org,
             )
         else:
             executor = SQLExecutor()
@@ -158,6 +195,8 @@ class NaturalLanguageQueryView(APIView):
                 sql=sanitized_sql,
                 question=question,
                 user=request.user,
+                organization=org,
+                datasource=None,
             )
 
         if not exec_result["success"]:
@@ -189,12 +228,22 @@ class NaturalLanguageQueryView(APIView):
             logger.warning(f"Could not generate result explanation: {exc}")
             explanation = f"Query executed successfully returning {exec_result['row_count']} rows."
 
+        # Apply column masking for non-admins
+        from apps.organizations.masking_service import DataMaskingService
+
+        final_rows = DataMaskingService.mask_result_set(
+            columns=exec_result["columns"],
+            rows=exec_result["rows"],
+            organization=org,
+            user_role=role,
+        )
+
         return api_response(
             data={
                 "question": question,
                 "sql": sanitized_sql,
                 "columns": exec_result["columns"],
-                "rows": exec_result["rows"],
+                "rows": final_rows,
                 "row_count": exec_result["row_count"],
                 "execution_time_ms": exec_result["execution_time_ms"],
                 "explanation": explanation,
@@ -224,6 +273,19 @@ class DirectSQLExecutionView(APIView):
         question = serializer.validated_data.get("question", "Direct SQL Execution")
         data_source_id = serializer.validated_data.get("data_source_id")
 
+        org, role = None, None
+        if request.user and request.user.is_authenticated:
+            from apps.organizations.models import RoleChoices
+            from apps.organizations.service import resolve_tenant_context
+
+            org, role = resolve_tenant_context(request)
+            if org and role == RoleChoices.VIEWER and not request.user.is_staff:
+                return api_error(
+                    message="Direct SQL execution is restricted to Analysts and Administrators.",
+                    code="DIRECT_SQL_RESTRICTED",
+                    status_code=status.HTTP_403_FORBIDDEN,
+                )
+
         datasource = None
         dialect = "postgresql"
         allowed_tables = None
@@ -236,10 +298,14 @@ class DirectSQLExecutionView(APIView):
 
             ds_qs = DataSource.objects.filter(id=data_source_id, is_active=True)
             if request.user.is_authenticated:
-                if not request.user.is_staff:
+                if org:
+                    ds_qs = ds_qs.filter(
+                        Q(organization=org) | Q(organization__isnull=True, user=request.user)
+                    )
+                elif not request.user.is_staff:
                     ds_qs = ds_qs.filter(Q(user=request.user) | Q(user__isnull=True))
             else:
-                ds_qs = ds_qs.filter(user__isnull=True)
+                ds_qs = ds_qs.filter(user__isnull=True, organization__isnull=True)
 
             datasource = ds_qs.first()
             if not datasource:
@@ -254,14 +320,33 @@ class DirectSQLExecutionView(APIView):
 
         # Validate
         validator = SQLValidator()
+        inference_cols = None
+        schema_cols = None
+        if role != "ADMIN" and org:
+            from apps.organizations.masking_service import DataMaskingService
+
+            policies = DataMaskingService.get_column_policy_map(org)
+            inference_cols = {
+                p.match_pattern.lower() for p in policies if p.match_type == "EXACT"
+            } | {"email", "phone"}
+            if datasource and datasource.cached_schema:
+                schema_cols = {
+                    t["name"].lower(): [c["name"].lower() for c in t.get("columns", [])]
+                    for t in datasource.cached_schema.get("tables", [])
+                }
+
         validation = validator.validate(
             raw_sql,
             allowed_tables=allowed_tables,
             dialect=dialect,
+            inference_restricted_columns=inference_cols,
+            schema_columns=schema_cols,
         )
         if not validation.is_valid:
             QueryHistory.objects.create(
                 user=request.user if request.user.is_authenticated else None,
+                organization=org,
+                datasource=datasource,
                 natural_language_question=question,
                 generated_sql=raw_sql,
                 execution_status=QueryStatus.BLOCKED,
@@ -281,6 +366,7 @@ class DirectSQLExecutionView(APIView):
                 sql=validation.sanitized_sql,
                 question=question,
                 user=request.user,
+                organization=org,
             )
         else:
             executor = SQLExecutor()
@@ -288,6 +374,8 @@ class DirectSQLExecutionView(APIView):
                 sql=validation.sanitized_sql,
                 question=question,
                 user=request.user,
+                organization=org,
+                datasource=None,
             )
 
         if not result["success"]:
@@ -297,11 +385,21 @@ class DirectSQLExecutionView(APIView):
                 details={"sql": validation.sanitized_sql} if settings.DEBUG else {},
             )
 
+        # Apply column masking for non-admins
+        from apps.organizations.masking_service import DataMaskingService
+
+        final_rows = DataMaskingService.mask_result_set(
+            columns=result["columns"],
+            rows=result["rows"],
+            organization=org,
+            user_role=role,
+        )
+
         return api_response(
             data={
                 "sql": validation.sanitized_sql,
                 "columns": result["columns"],
-                "rows": result["rows"],
+                "rows": final_rows,
                 "row_count": result["row_count"],
                 "execution_time_ms": result["execution_time_ms"],
                 "query_history_id": result.get("query_history_id"),
@@ -319,9 +417,17 @@ class QueryHistoryViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         qs = super().get_queryset()
         user = self.request.user
-        # Admin or staff can view all history; standard users see only their own
         if user.is_authenticated:
-            if not user.is_staff:
+            from apps.organizations.models import RoleChoices
+            from apps.organizations.service import resolve_tenant_context
+
+            org, role = resolve_tenant_context(self.request)
+            if org:
+                if role == RoleChoices.ADMIN or user.is_staff:
+                    qs = qs.filter(organization=org)
+                else:
+                    qs = qs.filter(organization=org, user=user)
+            elif not user.is_staff:
                 qs = qs.filter(user=user)
         else:
             # Anonymous callers are restricted to unassigned demo/anonymous records

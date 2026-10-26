@@ -230,6 +230,16 @@ class DashboardSummaryView(APIView):
             )
             .order_by("-lifetime_revenue")[:5]
         )
+        # Check role to mask emails for non-admin
+        from apps.organizations.masking_service import mask_email
+        from apps.organizations.models import RoleChoices
+        from apps.organizations.service import resolve_tenant_context
+
+        org, role = resolve_tenant_context(request)
+        if role != RoleChoices.ADMIN:
+            for item in top_customers:
+                item["email"] = mask_email(item.get("email", ""))
+
         for item in top_customers:
             item["lifetime_revenue"] = float(item["lifetime_revenue"] or 0)
 
@@ -434,8 +444,15 @@ class SavedReportViewSet(viewsets.ModelViewSet):
         qs = super().get_queryset()
         user = self.request.user
         if user.is_authenticated:
-            if not user.is_staff:
-                qs = qs.filter(models.Q(user=user) | models.Q(user__isnull=True))
+            from apps.organizations.service import resolve_tenant_context
+
+            org, role = resolve_tenant_context(self.request)
+            if org:
+                qs = qs.filter(
+                    models.Q(organization=org) | models.Q(organization__isnull=True, user=user)
+                )
+            elif not user.is_staff:
+                qs = qs.filter(user=user)
         else:
             qs = qs.filter(user__isnull=True)
 
@@ -455,6 +472,16 @@ class SavedReportViewSet(viewsets.ModelViewSet):
                     message="Authentication required to modify saved reports.",
                     code="AUTHENTICATION_REQUIRED",
                 )
+            from apps.organizations.models import RoleChoices
+            from apps.organizations.service import resolve_tenant_context
+
+            org, role = resolve_tenant_context(request)
+            if org and role == RoleChoices.VIEWER and not request.user.is_staff:
+                self.permission_denied(
+                    request,
+                    message="Viewers do not have permission to modify saved reports.",
+                    code="FORBIDDEN",
+                )
             if obj.user and obj.user != request.user and not request.user.is_staff:
                 self.permission_denied(
                     request,
@@ -470,7 +497,17 @@ class SavedReportViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         user = self.request.user if self.request.user.is_authenticated else None
-        serializer.save(user=user)
+        org = None
+        if user:
+            from apps.organizations.models import RoleChoices
+            from apps.organizations.service import resolve_tenant_context
+
+            org, role = resolve_tenant_context(self.request)
+            if org and role == RoleChoices.VIEWER and not user.is_staff:
+                from rest_framework.exceptions import PermissionDenied
+
+                raise PermissionDenied("Viewers cannot create saved reports.")
+        serializer.save(user=user, organization=org)
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -516,6 +553,10 @@ class SavedReportViewSet(viewsets.ModelViewSet):
             )
 
         # 2. Execute fresh
+        from apps.organizations.service import resolve_tenant_context
+
+        org, role = resolve_tenant_context(request)
+
         if report.data_source:
             from apps.datasources.executor import ExternalSQLExecutor
 
@@ -524,6 +565,7 @@ class SavedReportViewSet(viewsets.ModelViewSet):
                 sql=validation.sanitized_sql,
                 question=report.natural_language_question or report.name,
                 user=request.user,
+                organization=org,
             )
         else:
             from apps.ai_assistant.executor import SQLExecutor
@@ -533,6 +575,7 @@ class SavedReportViewSet(viewsets.ModelViewSet):
                 sql=validation.sanitized_sql,
                 question=report.natural_language_question or report.name,
                 user=request.user,
+                organization=org,
             )
 
         if not result["success"]:
@@ -542,6 +585,16 @@ class SavedReportViewSet(viewsets.ModelViewSet):
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
+        # Apply column masking for non-admins
+        from apps.organizations.masking_service import DataMaskingService
+
+        final_rows = DataMaskingService.mask_result_set(
+            columns=result.get("columns", []),
+            rows=result.get("rows", []),
+            organization=org,
+            user_role=role,
+        )
+
         return api_response(
             data={
                 "report_id": report.id,
@@ -549,7 +602,7 @@ class SavedReportViewSet(viewsets.ModelViewSet):
                 "chart_type": report.chart_type,
                 "chart_config": report.chart_config,
                 "columns": result.get("columns", []),
-                "rows": result.get("rows", []),
+                "rows": final_rows,
                 "row_count": result.get("row_count", 0),
                 "execution_time_ms": result.get("execution_time_ms", 0.0),
             }
@@ -558,6 +611,17 @@ class SavedReportViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"], url_path="duplicate")
     def duplicate(self, request, pk=None):
         """Duplicate an existing report definition."""
+        if request.user.is_authenticated:
+            from apps.organizations.models import RoleChoices
+            from apps.organizations.service import resolve_tenant_context
+
+            org, role = resolve_tenant_context(request)
+            if org and role == RoleChoices.VIEWER and not request.user.is_staff:
+                return api_error(
+                    message="Viewers do not have permission to duplicate reports.",
+                    code="FORBIDDEN",
+                    status_code=status.HTTP_403_FORBIDDEN,
+                )
         orig = self.get_object()
         copy_obj = SavedReport.objects.create(
             name=f"{orig.name} (Copy)",

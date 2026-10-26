@@ -57,6 +57,17 @@ class MLModelViewSet(viewsets.ReadOnlyModelViewSet):
                 status_code=status.HTTP_401_UNAUTHORIZED,
             )
 
+        from apps.organizations.models import RoleChoices
+        from apps.organizations.service import resolve_tenant_context
+
+        org, role = resolve_tenant_context(request)
+        if org and role != RoleChoices.ADMIN and not request.user.is_staff:
+            return api_error(
+                message="Only organization Administrators can approve and activate production model versions.",
+                code="ADMIN_REQUIRED",
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
         model_obj = self.get_object()
         version_id = request.data.get("version_id")
         if not version_id:
@@ -266,6 +277,18 @@ class TriggerMLJobAPIView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
+        if request.user and request.user.is_authenticated:
+            from apps.organizations.models import RoleChoices
+            from apps.organizations.service import resolve_tenant_context
+
+            org, role = resolve_tenant_context(request)
+            if org and role == RoleChoices.VIEWER and not request.user.is_staff:
+                return api_error(
+                    message="Viewers do not have permission to trigger background machine learning jobs.",
+                    code="FORBIDDEN",
+                    status_code=status.HTTP_403_FORBIDDEN,
+                )
+
         job_type = request.data.get("job_type", "TRAIN_FORECAST")
         parameters = request.data.get("parameters", {})
         run_async = request.data.get("run_async", True)

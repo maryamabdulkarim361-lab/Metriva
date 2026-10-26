@@ -37,6 +37,7 @@ urlpatterns = [
     path("api/health/", health_liveness, name="health-liveness"),
     path("api/ready/", health_readiness, name="health-readiness"),
     path("api/auth/", include("apps.authentication.urls")),
+    path("api/organizations/", include("apps.organizations.urls")),
     path("api/dashboard/", include("apps.analytics.urls_dashboard")),
     path("api/analytics/", include("apps.analytics.urls_analytics")),
     path("api/schema/", include("apps.ai_assistant.urls_schema")),

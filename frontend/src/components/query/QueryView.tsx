@@ -9,6 +9,7 @@ import {
   Database,
   Download,
   Lightbulb,
+  Lock,
   Play,
   Shield,
   ShieldAlert,
@@ -17,7 +18,7 @@ import {
   Terminal,
 } from "lucide-react";
 import { api } from "../../services/api";
-import { DataSource, QueryExecutionResult } from "../../types";
+import { DataSource, QueryExecutionResult, UserRole } from "../../types";
 import { ChartRecommendationView } from "./ChartRecommendationView";
 import { MetrivaBadge, MetrivaButton, MetrivaCard } from "../ui";
 
@@ -31,9 +32,10 @@ const DEMO_EXAMPLE_QUERIES = [
 
 interface QueryViewProps {
   initialQuestion?: string;
+  userRole?: UserRole;
 }
 
-export const QueryView: React.FC<QueryViewProps> = ({ initialQuestion = "" }) => {
+export const QueryView: React.FC<QueryViewProps> = ({ initialQuestion = "", userRole }) => {
   const [question, setQuestion] = useState(initialQuestion);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<QueryExecutionResult | null>(null);
@@ -177,21 +179,28 @@ export const QueryView: React.FC<QueryViewProps> = ({ initialQuestion = "" }) =>
           </p>
         </div>
 
-        <button
-          onClick={() => {
-            const nextMode = !directMode;
-            setDirectMode(nextMode);
-            setError(null);
-            setResult(null);
-            if (nextMode && !directSQL.trim() && /^(SELECT|WITH)\s/i.test(question.trim())) {
-              setDirectSQL(question.trim());
-            }
-          }}
-          className="self-start sm:self-auto text-xs px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 hover:bg-slate-200 dark:bg-slate-900/80 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white flex items-center gap-2 transition"
-        >
-          <Code2 className="h-3.5 w-3.5 text-cyan-600 dark:text-cyan-400" />
-          <span>{directMode ? "Switch to Natural Language" : "Direct SQL Mode"}</span>
-        </button>
+        {userRole !== "VIEWER" ? (
+          <button
+            onClick={() => {
+              const nextMode = !directMode;
+              setDirectMode(nextMode);
+              setError(null);
+              setResult(null);
+              if (nextMode && !directSQL.trim() && /^(SELECT|WITH)\s/i.test(question.trim())) {
+                setDirectSQL(question.trim());
+              }
+            }}
+            className="self-start sm:self-auto text-xs px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 hover:bg-slate-200 dark:bg-slate-900/80 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white flex items-center gap-2 transition"
+          >
+            <Code2 className="h-3.5 w-3.5 text-cyan-600 dark:text-cyan-400" />
+            <span>{directMode ? "Switch to Natural Language" : "Direct SQL Mode"}</span>
+          </button>
+        ) : (
+          <div className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100/60 dark:bg-slate-900/40 text-slate-500 dark:text-slate-400">
+            <Lock className="h-3.5 w-3.5" />
+            <span>Direct SQL (Analysts/Admins Only)</span>
+          </div>
+        )}
       </div>
 
       {/* Target Data Source Selector Banner */}
@@ -234,6 +243,15 @@ export const QueryView: React.FC<QueryViewProps> = ({ initialQuestion = "" }) =>
 
       {/* Main Input Card */}
       <MetrivaCard padding="lg" className="space-y-4">
+        {userRole === "VIEWER" && (
+          <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/40 text-amber-800 dark:text-amber-300 text-xs flex items-center gap-2.5">
+            <Lock className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+            <span>
+              <strong>Viewer Access:</strong> Ad-hoc query execution and Direct SQL are restricted for Viewers. Please consult pre-approved Reports and Dashboards.
+            </span>
+          </div>
+        )}
+
         {!directMode ? (
           <div>
             <div className="flex items-center justify-between mb-2">
@@ -249,20 +267,25 @@ export const QueryView: React.FC<QueryViewProps> = ({ initialQuestion = "" }) =>
             <div className="relative">
               <textarea
                 value={question}
+                disabled={userRole === "VIEWER"}
                 onChange={(e) => setQuestion(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                    handleAsk();
+                    if (userRole !== "VIEWER") handleAsk();
                   }
                 }}
                 rows={3}
-                placeholder="Ask anything about customers, revenue, products, orders, or clickstream events..."
-                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-4 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent resize-none font-sans"
+                placeholder={
+                  userRole === "VIEWER"
+                    ? "Ad-hoc query execution is restricted for Viewers."
+                    : "Ask anything about customers, revenue, products, orders, or clickstream events..."
+                }
+                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-4 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent resize-none font-sans disabled:opacity-60 disabled:cursor-not-allowed"
               />
               <div className="absolute right-3 bottom-3 flex items-center gap-2">
                 <span className="text-[10px] text-slate-400 dark:text-slate-500 hidden sm:inline">⌘ + Enter to run</span>
                 <MetrivaButton
-                  disabled={loading || !question.trim()}
+                  disabled={loading || !question.trim() || userRole === "VIEWER"}
                   onClick={() => handleAsk()}
                   size="sm"
                   variant="primary"
@@ -300,7 +323,7 @@ export const QueryView: React.FC<QueryViewProps> = ({ initialQuestion = "" }) =>
               <div className="flex items-center justify-between mt-3">
                 <span className="text-[10px] text-slate-400 dark:text-slate-500 hidden sm:inline">⌘ + Enter to run</span>
                 <MetrivaButton
-                  disabled={loading || !directSQL.trim()}
+                  disabled={loading || !directSQL.trim() || userRole === "VIEWER"}
                   onClick={() => handleAsk()}
                   size="sm"
                   variant="primary"
@@ -440,7 +463,7 @@ export const QueryView: React.FC<QueryViewProps> = ({ initialQuestion = "" }) =>
                   {result.row_count} {result.row_count === 1 ? "row" : "rows"} returned
                 </span>
               </div>
-              {result.rows.length > 0 && (
+              {result.rows.length > 0 && userRole !== "VIEWER" && (
                 <button
                   onClick={exportCSV}
                   className="flex items-center gap-1.5 text-xs text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white bg-white hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 transition shadow-sm"

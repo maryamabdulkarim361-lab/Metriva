@@ -13,8 +13,8 @@ import { ReportsView } from "./components/reports/ReportsView";
 import { SchemaExplorerView } from "./components/schema/SchemaExplorerView";
 import { SettingsView } from "./components/settings/SettingsView";
 import { AuthModal } from "./components/auth/AuthModal";
-import { api, getAuthToken } from "./services/api";
-import { AIStatus, DashboardData } from "./types";
+import { api, getAuthToken, setActiveOrgId } from "./services/api";
+import { AIStatus, CurrentUser, DashboardData, UserRole } from "./types";
 
 export interface AppProps {
   initialView?: "landing" | "app";
@@ -64,8 +64,19 @@ export const App: React.FC<AppProps> = ({ initialView, initialTab = "dashboard" 
   const [aiStatus, setAIStatus] = useState<AIStatus | null>(null);
   const [loadingDashboard, setLoadingDashboard] = useState<boolean>(true);
   const [activeQueryPrompt, setActiveQueryPrompt] = useState<string>("");
-  const [currentUser, setCurrentUser] = useState<{ name?: string; email?: string } | null>(null);
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+
+  const activeOrgId = currentUser?.active_organization?.id || null;
+  const userRole: UserRole = currentUser?.active_organization?.role || (currentUser?.is_staff ? "ADMIN" : "VIEWER");
+
+  const handleSelectOrganization = (orgId: number) => {
+    setActiveOrgId(orgId);
+    api.getCurrentUser().then((u) => {
+      setCurrentUser(u);
+      refreshDashboard();
+    });
+  };
 
   const refreshStatus = () => {
     api
@@ -180,6 +191,7 @@ export const App: React.FC<AppProps> = ({ initialView, initialTab = "dashboard" 
               setCurrentUser(null);
             }}
             onNavigateToLanding={handleNavigateToLanding}
+            onSelectOrganization={handleSelectOrganization}
           />
 
           <div className="flex-1 flex overflow-hidden">
@@ -260,10 +272,14 @@ export const App: React.FC<AppProps> = ({ initialView, initialTab = "dashboard" 
               )}
 
               {activeTab === "query" && (
-                <QueryView key={activeQueryPrompt} initialQuestion={activeQueryPrompt} />
+                <QueryView
+                  key={activeQueryPrompt}
+                  initialQuestion={activeQueryPrompt}
+                  userRole={userRole}
+                />
               )}
 
-              {activeTab === "datasources" && <DatabaseConnectionsView />}
+              {activeTab === "datasources" && <DatabaseConnectionsView userRole={userRole} />}
 
               {activeTab === "reports" && <ReportsView />}
 
@@ -280,7 +296,12 @@ export const App: React.FC<AppProps> = ({ initialView, initialTab = "dashboard" 
               {activeTab === "analytics" && <DeepAnalyticsView />}
 
               {activeTab === "settings" && (
-                <SettingsView aiStatus={aiStatus} onRefreshStatus={refreshStatus} />
+                <SettingsView
+                  aiStatus={aiStatus}
+                  onRefreshStatus={refreshStatus}
+                  activeOrgId={activeOrgId}
+                  userRole={userRole}
+                />
               )}
             </main>
           </div>

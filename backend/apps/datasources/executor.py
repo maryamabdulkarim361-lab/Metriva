@@ -45,7 +45,13 @@ class ExternalSQLExecutor:
         )
         self.max_bytes = self.max_result_size_mb * 1024 * 1024
 
-    def execute(self, sql: str, question: str = "", user=None) -> dict[str, Any]:
+    def execute(
+        self,
+        sql: str,
+        question: str = "",
+        user=None,
+        organization=None,
+    ) -> dict[str, Any]:
         """
         Execute read-only SQL query on the external data source.
         Returns standardized execution dictionary.
@@ -113,8 +119,11 @@ class ExternalSQLExecutor:
 
             row_count = len(serialized_rows)
 
+            effective_org = organization or getattr(self.datasource, "organization", None)
             history = QueryHistory.objects.create(
                 user=user if user and user.is_authenticated else None,
+                organization=effective_org,
+                datasource=self.datasource,
                 natural_language_question=question,
                 generated_sql=sql,
                 execution_status=QueryStatus.SUCCESS,
@@ -146,6 +155,8 @@ class ExternalSQLExecutor:
 
             history = QueryHistory.objects.create(
                 user=user if user and user.is_authenticated else None,
+                organization=effective_org,
+                datasource=self.datasource,
                 natural_language_question=question,
                 generated_sql=sql,
                 execution_status=status_val,

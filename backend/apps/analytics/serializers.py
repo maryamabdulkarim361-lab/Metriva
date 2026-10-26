@@ -33,6 +33,19 @@ class CustomerSerializer(serializers.ModelSerializer):
             "total_spent",
         ]
 
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        request = self.context.get("request")
+        if request and request.user and request.user.is_authenticated:
+            from apps.organizations.masking_service import mask_email
+            from apps.organizations.models import RoleChoices
+            from apps.organizations.service import resolve_tenant_context
+
+            _, role = resolve_tenant_context(request)
+            if role != RoleChoices.ADMIN and ret.get("email"):
+                ret["email"] = mask_email(ret["email"])
+        return ret
+
 
 class ProductSerializer(serializers.ModelSerializer):
     profit_margin = serializers.SerializerMethodField()

@@ -24,6 +24,17 @@ class QueryRequestSerializer(serializers.Serializer):
         default=None,
         help_text="Optional ID of external DataSource to query. Defaults to internal PostgreSQL analytics database.",
     )
+    datasource_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        default=None,
+    )
+
+    def to_internal_value(self, data):
+        data = data.copy() if hasattr(data, "copy") else dict(data)
+        if "datasource_id" in data and "data_source_id" not in data:
+            data["data_source_id"] = data["datasource_id"]
+        return super().to_internal_value(data)
 
 
 class DirectSQLRequestSerializer(serializers.Serializer):
@@ -45,6 +56,17 @@ class DirectSQLRequestSerializer(serializers.Serializer):
         default=None,
         help_text="Optional ID of external DataSource to query. Defaults to internal PostgreSQL analytics database.",
     )
+    datasource_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        default=None,
+    )
+
+    def to_internal_value(self, data):
+        data = data.copy() if hasattr(data, "copy") else dict(data)
+        if "datasource_id" in data and "data_source_id" not in data:
+            data["data_source_id"] = data["datasource_id"]
+        return super().to_internal_value(data)
 
 
 class QueryHistorySerializer(serializers.ModelSerializer):

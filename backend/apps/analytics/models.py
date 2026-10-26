@@ -326,6 +326,14 @@ class SavedReport(models.Model):
         on_delete=models.SET_NULL,
         related_name="saved_reports",
     )
+    organization = models.ForeignKey(
+        "organizations.Organization",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="saved_reports",
+        help_text="Owning organization for multi-tenant isolation.",
+    )
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,
@@ -383,6 +391,14 @@ class ScheduledReport(models.Model):
     delivery_target = models.CharField(max_length=500, blank=True, default="")
     last_run_at = models.DateTimeField(null=True, blank=True)
     next_run_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    organization = models.ForeignKey(
+        "organizations.Organization",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="scheduled_reports",
+        help_text="Owning organization for multi-tenant isolation.",
+    )
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,

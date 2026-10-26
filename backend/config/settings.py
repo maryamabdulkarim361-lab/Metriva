@@ -63,6 +63,7 @@ INSTALLED_APPS = [
     # Local apps
     "apps.core.apps.CoreConfig",
     "apps.authentication.apps.AuthenticationConfig",
+    "apps.organizations.apps.OrganizationsConfig",
     "apps.analytics.apps.AnalyticsConfig",
     "apps.ai_assistant.apps.AiAssistantConfig",
     "apps.datasources.apps.DatasourcesConfig",

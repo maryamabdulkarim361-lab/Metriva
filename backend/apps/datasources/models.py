@@ -30,6 +30,14 @@ class DataSource(models.Model):
     """
 
     id = models.BigAutoField(primary_key=True)
+    organization = models.ForeignKey(
+        "organizations.Organization",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="datasources",
+        help_text="Owning organization for multi-tenant isolation.",
+    )
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,
@@ -88,6 +96,7 @@ class DataSource(models.Model):
         verbose_name_plural = "Data Sources"
         ordering = ["-created_at"]
         indexes = [
+            models.Index(fields=["organization", "is_active"], name="idx_ds_org_active"),
             models.Index(fields=["user", "is_active"], name="idx_ds_user_active"),
             models.Index(fields=["engine", "is_active"], name="idx_ds_engine_active"),
         ]

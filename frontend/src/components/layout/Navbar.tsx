@@ -1,15 +1,16 @@
 import React from "react";
-import { Compass, Database, LogIn, LogOut, ShieldCheck, Sparkles, Terminal, User } from "lucide-react";
-import { AIStatus } from "../../types";
+import { Building2, Compass, Database, LogIn, LogOut, ShieldCheck, Sparkles, Terminal, User } from "lucide-react";
+import { AIStatus, CurrentUser } from "../../types";
 import { MetrivaLogo, ThemeToggle } from "../ui";
 
 interface NavbarProps {
   aiStatus: AIStatus | null;
   onOpenQuery: () => void;
-  currentUser?: { name?: string; email?: string } | null;
+  currentUser?: CurrentUser | null;
   onOpenAuth?: () => void;
   onLogout?: () => void;
   onNavigateToLanding?: () => void;
+  onSelectOrganization?: (orgId: number) => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -19,6 +20,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenAuth,
   onLogout,
   onNavigateToLanding,
+  onSelectOrganization,
 }) => {
   return (
     <header className="h-16 border-b border-slate-200 dark:border-slate-800/90 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md px-4 sm:px-6 flex items-center justify-between sticky top-0 z-40 transition-colors">
@@ -75,6 +77,42 @@ export const Navbar: React.FC<NavbarProps> = ({
             {aiStatus?.demo_mode ? "Demo AI (Deterministic)" : `AI: ${aiStatus?.model || "OpenAI"}`}
           </span>
         </div>
+
+        {/* Active Organization & Role Pill */}
+        {currentUser?.active_organization && (
+          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs">
+            <Building2 className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
+            {currentUser.organizations && currentUser.organizations.length > 1 && onSelectOrganization ? (
+              <select
+                aria-label="Active Organization"
+                value={currentUser.active_organization.id}
+                onChange={(e) => onSelectOrganization(Number(e.target.value))}
+                className="bg-transparent font-medium text-slate-800 dark:text-slate-200 text-xs focus:outline-none cursor-pointer"
+              >
+                {currentUser.organizations.map((org) => (
+                  <option key={org.id} value={org.id} className="dark:bg-slate-900 dark:text-white">
+                    {org.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <span className="font-medium text-slate-800 dark:text-slate-200 max-w-[120px] truncate" title={currentUser.active_organization.name}>
+                {currentUser.active_organization.name}
+              </span>
+            )}
+            <span
+              className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded border ${
+                currentUser.active_organization.role === "ADMIN"
+                  ? "bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-500/30"
+                  : currentUser.active_organization.role === "ANALYST"
+                  ? "bg-cyan-100 dark:bg-cyan-950/60 text-cyan-700 dark:text-cyan-300 border-cyan-200 dark:border-cyan-500/30"
+                  : "bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700"
+              }`}
+            >
+              {currentUser.active_organization.role}
+            </span>
+          </div>
+        )}
 
         {/* Auth status or Sign in */}
         {currentUser ? (

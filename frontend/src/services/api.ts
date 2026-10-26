@@ -2,6 +2,8 @@ import {
   AIStatus,
   ApiResponse,
   CachedSchema,
+  ColumnMaskingPolicy,
+  CurrentUser,
   DashboardData,
   DataSource,
   MetricDefinition,
@@ -12,6 +14,8 @@ import {
   MLInsights,
   MLJob,
   MLModel,
+  Organization,
+  OrganizationMembership,
   PeriodComparisonResult,
   QueryExecutionResult,
   QueryHistoryItem,
@@ -20,10 +24,12 @@ import {
   SchemaMetadata,
   TestConnectionRequest,
   TestConnectionResponse,
+  UserRole,
 } from "../types";
 
 const BASE_URL = "/api";
 const TOKEN_KEY = "aidb_access_token";
+const ACTIVE_ORG_KEY = "aidb_active_org_id";
 
 export const getAuthToken = (): string | null => {
   try {
@@ -47,11 +53,39 @@ export const setAuthToken = (token: string | null): void => {
   }
 };
 
+export const getActiveOrgId = (): number | null => {
+  try {
+    if (typeof localStorage !== "undefined") {
+      const val = localStorage.getItem(ACTIVE_ORG_KEY);
+      return val ? parseInt(val, 10) : null;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+};
+
+export const setActiveOrgId = (id: number | null): void => {
+  try {
+    if (typeof localStorage !== "undefined") {
+      if (id !== null) {
+        localStorage.setItem(ACTIVE_ORG_KEY, String(id));
+      } else {
+        localStorage.removeItem(ACTIVE_ORG_KEY);
+      }
+    }
+  } catch {
+    // Ignore storage errors
+  }
+};
+
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = getAuthToken();
+  const activeOrgId = getActiveOrgId();
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(activeOrgId ? { "X-Organization-ID": String(activeOrgId) } : {}),
     ...((options.headers as Record<string, string>) || {}),
   };
 
@@ -375,6 +409,66 @@ export const api = {
     request<{ job_id: number; status: string }>("/ml/jobs/trigger/", {
       method: "POST",
       body: JSON.stringify({ job_type: jobType, parameters: parameters || {} }),
+    }),
+
+  // Organizations & RBAC Team Management
+  getOrganizations: (): Promise<Organization[]> => request<Organization[]>("/organizations/"),
+
+  createOrganization: (name: string): Promise<Organization> =>
+    request<Organization>("/organizations/", {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    }),
+
+  getOrganizationMembers: (orgId: number): Promise<OrganizationMembership[]> =>
+    request<OrganizationMembership[]>(`/organizations/${orgId}/members/`),
+
+  addOrganizationMember: (
+    orgId: number,
+    email: string,
+    role: UserRole
+  ): Promise<OrganizationMembership> =>
+    request<OrganizationMembership>(`/organizations/${orgId}/members/`, {
+      method: "POST",
+      body: JSON.stringify({ email, role }),
+    }),
+
+  updateMemberRole: (
+    orgId: number,
+    userId: number,
+    role: UserRole
+  ): Promise<OrganizationMembership> =>
+    request<OrganizationMembership>(`/organizations/${orgId}/members/${userId}/`, {
+      method: "PATCH",
+      body: JSON.stringify({ role }),
+    }),
+
+  removeOrganizationMember: (orgId: number, userId: number): Promise<any> =>
+    request<any>(`/organizations/${orgId}/members/${userId}/`, {
+      method: "DELETE",
+    }),
+
+  getMaskingPolicies: (orgId: number): Promise<ColumnMaskingPolicy[]> =>
+    request<ColumnMaskingPolicy[]>(`/organizations/${orgId}/masking-policies/`),
+
+  createMaskingPolicy: (
+    orgId: number,
+    policy: {
+      rule_name: string;
+      match_type: "EXACT" | "REGEX";
+      match_pattern: string;
+      masking_type: "REDACT" | "EMAIL" | "PHONE" | "NULLIFY";
+      is_active?: boolean;
+    }
+  ): Promise<ColumnMaskingPolicy> =>
+    request<ColumnMaskingPolicy>(`/organizations/${orgId}/masking-policies/`, {
+      method: "POST",
+      body: JSON.stringify(policy),
+    }),
+
+  deleteMaskingPolicy: (orgId: number, policyId: number): Promise<any> =>
+    request<any>(`/organizations/${orgId}/masking-policies/${policyId}/`, {
+      method: "DELETE",
     }),
 };
 

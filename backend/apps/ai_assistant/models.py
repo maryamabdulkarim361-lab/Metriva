@@ -18,6 +18,22 @@ class QueryHistory(models.Model):
     """
 
     id = models.BigAutoField(primary_key=True)
+    organization = models.ForeignKey(
+        "organizations.Organization",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="query_histories",
+        help_text="Owning organization for multi-tenant audit isolation.",
+    )
+    datasource = models.ForeignKey(
+        "datasources.DataSource",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="query_histories",
+        help_text="Target data source queried, if external.",
+    )
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,
@@ -45,6 +61,7 @@ class QueryHistory(models.Model):
         verbose_name_plural = "Query Histories"
         ordering = ["-created_at"]
         indexes = [
+            models.Index(fields=["organization", "created_at"], name="idx_qh_org_created"),
             models.Index(fields=["created_at", "execution_status"], name="idx_qh_created_status"),
         ]
 

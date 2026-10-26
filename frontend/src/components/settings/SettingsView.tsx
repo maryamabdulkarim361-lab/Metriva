@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   CheckCircle,
   Database,
@@ -8,16 +8,27 @@ import {
   Settings as SettingsIcon,
   ShieldCheck,
   Sparkles,
+  Users,
 } from "lucide-react";
-import { AIStatus } from "../../types";
+import { AIStatus, UserRole } from "../../types";
 import { MetrivaCard, MetrivaBadge, MetrivaButton, METRIVA_TOKENS } from "../../design-system";
+import { TeamAccessView } from "./TeamAccessView";
 
 interface SettingsViewProps {
   aiStatus: AIStatus | null;
   onRefreshStatus: () => void;
+  activeOrgId?: number | null;
+  userRole?: UserRole;
 }
 
-export const SettingsView: React.FC<SettingsViewProps> = ({ aiStatus, onRefreshStatus }) => {
+export const SettingsView: React.FC<SettingsViewProps> = ({
+  aiStatus,
+  onRefreshStatus,
+  activeOrgId,
+  userRole = "VIEWER",
+}) => {
+  const [tab, setTab] = useState<"system" | "team">("system");
+
   return (
     <div className="space-y-6 max-w-4xl pb-16">
       {/* Header */}
@@ -33,20 +44,52 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ aiStatus, onRefreshS
             System & Engine Settings
           </h2>
           <p className="text-sm text-slate-600 dark:text-slate-400">
-            Runtime environment, AI provider abstractions, security policies, and database connection status.
+            Runtime environment, AI provider abstractions, security policies, and team access.
           </p>
         </div>
 
+        {tab === "system" && (
+          <button
+            onClick={onRefreshStatus}
+            className="self-start sm:self-auto flex items-center gap-1.5 text-xs bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-3.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 transition"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            <span>Refresh Config</span>
+          </button>
+        )}
+      </div>
+
+      {/* Sub Navigation */}
+      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2 text-xs font-semibold">
         <button
-          onClick={onRefreshStatus}
-          className="self-start sm:self-auto flex items-center gap-1.5 text-xs bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-3.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 transition"
+          onClick={() => setTab("system")}
+          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition ${
+            tab === "system"
+              ? "bg-cyan-50 dark:bg-cyan-950/60 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-500/30"
+              : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900"
+          }`}
         >
-          <RotateCcw className="h-3.5 w-3.5" />
-          <span>Refresh Config</span>
+          <Server className="h-3.5 w-3.5" />
+          <span>System & Engine</span>
+        </button>
+        <button
+          onClick={() => setTab("team")}
+          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition ${
+            tab === "team"
+              ? "bg-cyan-50 dark:bg-cyan-950/60 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-500/30"
+              : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900"
+          }`}
+        >
+          <Users className="h-3.5 w-3.5" />
+          <span>Team & Access (RBAC)</span>
         </button>
       </div>
 
-      {/* AI Provider Section */}
+      {tab === "team" ? (
+        <TeamAccessView activeOrgId={activeOrgId} userRole={userRole} />
+      ) : (
+        <>
+          {/* AI Provider Section */}
       <MetrivaCard variant="glass" className="p-6 shadow-xl space-y-4">
         <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800/80 pb-3">
           <div className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
@@ -157,7 +200,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ aiStatus, onRefreshS
           </div>
         </div>
       </MetrivaCard>
-    </div>
-  );
+    </>
+    )}
+  </div>
+);
 };
 export default SettingsView;

@@ -81,11 +81,15 @@ class DataSourceSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         password = validated_data.pop("password", "")
-        # Associate with requesting user if authenticated
+        # Associate with requesting user and organization if authenticated
         request = self.context.get("request")
         user = request.user if request and request.user.is_authenticated else None
+        org = None
+        if request and user:
+            from apps.organizations.service import resolve_tenant_context
+            org, _ = resolve_tenant_context(request)
 
-        instance = DataSource.objects.create(user=user, **validated_data)
+        instance = DataSource.objects.create(user=user, organization=org, **validated_data)
         if password:
             instance.set_password(password)
             instance.save(update_fields=["encrypted_password"])

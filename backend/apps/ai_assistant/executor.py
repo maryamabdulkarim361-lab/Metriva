@@ -55,6 +55,8 @@ class SQLExecutor:
         sql: str,
         question: str,
         user=None,
+        organization=None,
+        datasource=None,
     ) -> dict[str, Any]:
         """
         Execute read-only SQL query and record telemetry.
@@ -110,6 +112,8 @@ class SQLExecutor:
 
             history = QueryHistory.objects.create(
                 user=user if user and user.is_authenticated else None,
+                organization=organization,
+                datasource=datasource,
                 natural_language_question=question,
                 generated_sql=sql,
                 execution_status=QueryStatus.SUCCESS,
@@ -134,6 +138,8 @@ class SQLExecutor:
 
             history = QueryHistory.objects.create(
                 user=user if user and user.is_authenticated else None,
+                organization=organization,
+                datasource=datasource,
                 natural_language_question=question,
                 generated_sql=sql,
                 execution_status=status,

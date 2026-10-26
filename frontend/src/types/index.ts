@@ -462,3 +462,56 @@ export interface MLJob {
   completed_at?: string | null;
   created_at: string;
 }
+
+export type UserRole = 'ADMIN' | 'ANALYST' | 'VIEWER';
+
+export interface OrganizationMembership {
+  id: number;
+  user_id: number;
+  user_email: string;
+  user_name: string;
+  role: UserRole;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Organization {
+  id: number;
+  name: string;
+  slug: string;
+  role: UserRole;
+  member_count: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ColumnMaskingPolicy {
+  id: number;
+  rule_name: string;
+  match_type: 'EXACT' | 'REGEX';
+  match_pattern: string;
+  masking_type: 'REDACT' | 'EMAIL' | 'PHONE' | 'NULLIFY';
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CurrentUser {
+  id?: number;
+  name?: string;
+  email: string;
+  is_staff?: boolean;
+  active_organization?: {
+    id: number;
+    name: string;
+    slug: string;
+    role: UserRole;
+  } | null;
+  organizations?: {
+    id: number;
+    name: string;
+    slug: string;
+    role: UserRole;
+  }[];
+}

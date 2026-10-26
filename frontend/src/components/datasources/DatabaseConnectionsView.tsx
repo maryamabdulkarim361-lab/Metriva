@@ -26,10 +26,15 @@ import {
   DataSourceEngine,
   SSLMode,
   TestConnectionRequest,
+  UserRole,
 } from "../../types";
 import { MetrivaBadge, MetrivaButton, MetrivaCard } from "../ui";
 
-export const DatabaseConnectionsView: React.FC = () => {
+interface DatabaseConnectionsViewProps {
+  userRole?: UserRole;
+}
+
+export const DatabaseConnectionsView: React.FC<DatabaseConnectionsViewProps> = ({ userRole = "ADMIN" }) => {
   const [dataSources, setDataSources] = useState<DataSource[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -304,15 +309,22 @@ export const DatabaseConnectionsView: React.FC = () => {
             Connect external PostgreSQL, MySQL, and SQLite databases for AI-powered natural language queries.
           </p>
         </div>
-        <MetrivaButton
-          onClick={openAddModal}
-          size="sm"
-          variant="primary"
-          icon={<Plus className="h-4 w-4" />}
-          className="self-start sm:self-auto"
-        >
-          Add Connection
-        </MetrivaButton>
+        {userRole === "ADMIN" ? (
+          <MetrivaButton
+            onClick={openAddModal}
+            size="sm"
+            variant="primary"
+            icon={<Plus className="h-4 w-4" />}
+            className="self-start sm:self-auto"
+          >
+            Add Connection
+          </MetrivaButton>
+        ) : (
+          <div className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100/60 dark:bg-slate-900/40 text-slate-500 dark:text-slate-400">
+            <Lock className="h-3.5 w-3.5" />
+            <span>Connection Management (Admin Only)</span>
+          </div>
+        )}
       </div>
 
       {/* Alerts */}
@@ -399,22 +411,24 @@ export const DatabaseConnectionsView: React.FC = () => {
                       <h3 className="text-base font-bold text-slate-900 dark:text-white mt-1.5">{ds.name}</h3>
                     </div>
 
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => openEditModal(ds)}
-                        title="Edit Connection"
-                        className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-cyan-600 dark:hover:text-cyan-300 hover:bg-slate-100 dark:hover:bg-slate-800/80 rounded-lg transition-colors"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(ds)}
-                        title="Delete Connection"
-                        className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
+                    {userRole === "ADMIN" && (
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => openEditModal(ds)}
+                          title="Edit Connection"
+                          className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-cyan-600 dark:hover:text-cyan-300 hover:bg-slate-100 dark:hover:bg-slate-800/80 rounded-lg transition-colors"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(ds)}
+                          title="Delete Connection"
+                          className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   <div className="mt-4 space-y-1.5 text-xs text-slate-600 dark:text-slate-400 font-mono bg-slate-50 dark:bg-slate-950/70 p-3 rounded-xl border border-slate-200 dark:border-slate-800/80">

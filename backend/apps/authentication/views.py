@@ -56,7 +56,7 @@ class MeView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        return api_response(data=UserSerializer(request.user).data)
+        return api_response(data=UserSerializer(request.user, context={"request": request}).data)
 
 
 class CustomTokenRefreshView(TokenRefreshView):

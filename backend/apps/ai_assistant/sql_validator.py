@@ -147,6 +147,9 @@ class SQLValidator:
         raw_sql: str,
         allowed_tables: Optional[list[str]] = None,
         dialect: str = "postgresql",
+        restricted_columns: Optional[set[str]] = None,
+        inference_restricted_columns: Optional[set[str]] = None,
+        schema_columns: Optional[dict[str, list[str]]] = None,
     ) -> ValidationResult:
         """Run full multi-stage validation pipeline on raw SQL string."""
         if not raw_sql or not raw_sql.strip():
@@ -342,7 +345,9 @@ class SQLValidator:
             tables_used.append(table_name)
 
         # 9. Check for sensitive columns exfiltration
-        sensitive_col_result = self._check_sensitive_columns(stmt, single_sql, tables_used)
+        sensitive_col_result = self._check_sensitive_columns(
+            stmt, single_sql, tables_used, restricted_columns
+        )
         if not sensitive_col_result[0]:
             return ValidationResult(
                 is_valid=False,
@@ -350,6 +355,19 @@ class SQLValidator:
                 error_code="SENSITIVE_COLUMN_PROHIBITED",
                 error_message=sensitive_col_result[1],
             )
+
+        # 9b. Check for inference attack restrictions
+        if inference_restricted_columns:
+            inference_result = self._check_inference_restrictions(
+                stmt, single_sql, tables_used, inference_restricted_columns, schema_columns
+            )
+            if not inference_result[0]:
+                return ValidationResult(
+                    is_valid=False,
+                    sanitized_sql=single_sql,
+                    error_code="INFERENCE_RISK_DETECTED",
+                    error_message=inference_result[1],
+                )
 
         # 10. Enforce LIMIT
         enforced_sql = self._enforce_limit(single_sql)
@@ -361,8 +379,18 @@ class SQLValidator:
             statement_type=statement_type if statement_type != "UNKNOWN" else clean_first_word,
         )
 
-    def _check_sensitive_columns(self, statement, sql: str, tables_used: list[str]) -> tuple[bool, Optional[str]]:
+    def _check_sensitive_columns(
+        self,
+        statement,
+        sql: str,
+        tables_used: list[str],
+        custom_restricted: Optional[set[str]] = None,
+    ) -> tuple[bool, Optional[str]]:
         """Verify query does not reference or exfiltrate sensitive columns like password hashes."""
+        all_forbidden = set(FORBIDDEN_COLUMNS)
+        if custom_restricted:
+            all_forbidden.update(c.lower() for c in custom_restricted)
+
         # 1. Prohibit wildcard queries whenever the users table is referenced
         users_referenced = any(
             t.lower().split(".")[-1].strip('"\'`') == "users" for t in tables_used
@@ -382,11 +410,66 @@ class SQLValidator:
             clean_val = token.value.lower().strip('"\'`')
             if "." in clean_val:
                 clean_val = clean_val.split(".")[-1]
-            if clean_val in FORBIDDEN_COLUMNS:
+            if clean_val in all_forbidden:
                 return (
                     False,
                     f"Access to sensitive column '{clean_val}' is strictly prohibited.",
                 )
+
+        return (True, None)
+
+    def _check_inference_restrictions(
+        self,
+        statement,
+        sql: str,
+        tables_used: list[str],
+        inference_restricted_columns: set[str],
+        schema_columns: Optional[dict[str, list[str]]] = None,
+    ) -> tuple[bool, Optional[str]]:
+        """
+        Prevent inference attacks by forbidding filtering (WHERE/ON), grouping (GROUP BY),
+        sorting (ORDER BY), or aggregation (HAVING) on columns targeted for masking.
+        Also blocks wildcard (*) expansion if the target table contains an inference-restricted column.
+        """
+        clean_restricted = set(c.lower() for c in inference_restricted_columns)
+
+        # 1. Check for wildcard expansion risk
+        has_wildcard = any(
+            t.ttype is Wildcard or t.value.strip() == "*" or t.value.strip().endswith(".*")
+            for t in statement.flatten()
+        )
+        if has_wildcard and schema_columns:
+            for tbl in tables_used:
+                t_cols = [c.lower() for c in schema_columns.get(tbl.lower(), [])]
+                for col in clean_restricted:
+                    if col in t_cols:
+                        return (
+                            False,
+                            f"Wildcard (*) query on table '{tbl}' involves sensitive column '{col}'. Explicitly list permitted columns.",
+                        )
+
+        # 2. Extract tokens inside restricted clauses
+        clause_keywords = {"WHERE", "ON", "GROUP BY", "HAVING", "ORDER BY"}
+        current_clause = None
+
+        for token in statement.flatten():
+            val = token.value.upper().strip()
+            if val in clause_keywords:
+                current_clause = val
+                continue
+            elif val in ("SELECT", "FROM", "LIMIT", "UNION", "INTERSECT", "EXCEPT"):
+                current_clause = None
+                continue
+
+            if current_clause:
+                clean_tok = token.value.lower().strip('"\'`')
+                if "." in clean_tok:
+                    clean_tok = clean_tok.split(".")[-1]
+                if clean_tok in clean_restricted:
+                    return (
+                        False,
+                        f"Filtering, grouping, or sorting on sensitive column '{clean_tok}' in {current_clause} clause is prohibited to prevent data inference attacks.",
+                    )
 
         return (True, None)
 

@@ -2,6 +2,7 @@
 
 import logging
 
+from django.db import models
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 
@@ -17,6 +18,8 @@ from apps.datasources.serializers import (
     TestConnectionRequestSerializer,
     UpdateAllowedTablesSerializer,
 )
+from apps.organizations.models import OrganizationMembership, RoleChoices
+from apps.organizations.service import resolve_tenant_context
 
 logger = logging.getLogger(__name__)
 
@@ -35,11 +38,22 @@ class DataSourceViewSet(viewsets.ModelViewSet):
         qs = super().get_queryset()
         user = self.request.user
         if user.is_authenticated:
-            if not user.is_staff:
+            org, role = resolve_tenant_context(self.request)
+            if org:
+                # Scoped to active organization, or legacy datasource owned by user
+                qs = qs.filter(
+                    models.Q(organization=org) | models.Q(organization__isnull=True, user=user)
+                )
+            elif user.is_staff:
+                pass
+            else:
                 qs = qs.filter(user=user)
         else:
             # Anonymous callers in demo mode only see demo/unassigned data sources
-            qs = qs.filter(user__isnull=True)
+            qs = qs.filter(
+                models.Q(user__isnull=True)
+                & (models.Q(organization__slug="metriva-demo-org") | models.Q(organization__isnull=True))
+            )
         return qs
 
     def check_object_permissions(self, request, obj):
@@ -51,13 +65,26 @@ class DataSourceViewSet(viewsets.ModelViewSet):
                     message="Authentication required to modify external data sources.",
                     code="AUTHENTICATION_REQUIRED",
                 )
-            if obj.user and obj.user != request.user and not request.user.is_staff:
+
+            # If datasource belongs to an organization, check role within that organization
+            if obj.organization:
+                mem = OrganizationMembership.objects.filter(
+                    organization=obj.organization,
+                    user=request.user,
+                ).first()
+                if not mem or (mem.role != RoleChoices.ADMIN and not request.user.is_staff):
+                    self.permission_denied(
+                        request,
+                        message="Only organization Administrators can modify this data source.",
+                        code="ADMIN_REQUIRED",
+                    )
+            elif obj.user and obj.user != request.user and not request.user.is_staff:
                 self.permission_denied(
                     request,
                     message="You do not have permission to modify this data source.",
                     code="FORBIDDEN",
                 )
-            if obj.user is None and not request.user.is_staff:
+            elif obj.user is None and not request.user.is_staff:
                 self.permission_denied(
                     request,
                     message="System data sources can only be modified by administrators.",
@@ -75,6 +102,15 @@ class DataSourceViewSet(viewsets.ModelViewSet):
         return api_response(data=serializer.data)
 
     def create(self, request, *args, **kwargs):
+        if request.user and request.user.is_authenticated:
+            org, role = resolve_tenant_context(request)
+            if org and role != RoleChoices.ADMIN and not request.user.is_staff:
+                return api_error(
+                    message="Only organization Administrators can register external database connections.",
+                    code="ADMIN_REQUIRED",
+                    status_code=status.HTTP_403_FORBIDDEN,
+                )
+
         serializer = self.get_serializer(data=request.data)
         if not serializer.is_valid():
             return api_error(
@@ -140,6 +176,15 @@ class DataSourceViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["post"], url_path="test-raw")
     def test_raw(self, request):
         """Test connectivity of raw parameters from connection form before saving."""
+        if request.user and request.user.is_authenticated:
+            org, role = resolve_tenant_context(request)
+            if org and role != RoleChoices.ADMIN and not request.user.is_staff:
+                return api_error(
+                    message="Only organization Administrators can test raw database connections.",
+                    code="ADMIN_REQUIRED",
+                    status_code=status.HTTP_403_FORBIDDEN,
+                )
+
         serializer = TestConnectionRequestSerializer(data=request.data)
         if not serializer.is_valid():
             return api_error(
