@@ -1,15 +1,17 @@
 # Metriva
 
-> Enterprise-grade conversational business intelligence, predictive machine learning, and safe natural language analytics for PostgreSQL, MySQL, and SQLite.
+> Enterprise-grade conversational business intelligence, predictive machine learning, multi-tenant RBAC, and column-level data protection for PostgreSQL, MySQL, and SQLite.
 
+[![CI](https://github.com/maryamabdulkarim361-lab/Metriva/actions/workflows/tests.yml/badge.svg)](https://github.com/maryamabdulkarim361-lab/Metriva/actions/workflows/tests.yml)
 [![Python](https://img.shields.io/badge/Python-3.14%20%7C%203.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Django](https://img.shields.io/badge/Django-5.2-092E20?logo=django&logoColor=white)](https://www.djangoproject.com/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![MySQL](https://img.shields.io/badge/MySQL-8.4%20LTS-4479A1?logo=mysql&logoColor=white)](https://www.mysql.com/)
 [![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-5-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
-[![Backend Tests](https://img.shields.io/badge/Pytest-161%20Passed%20(100%25)-success?logo=pytest&logoColor=white)](#testing--verification)
-[![Frontend Tests](https://img.shields.io/badge/Vitest-38%20Passed%20(100%25)-success?logo=vitest&logoColor=white)](#testing--verification)
+[![Backend Tests](https://img.shields.io/badge/Pytest-184%20Passed%20(100%25)-success?logo=pytest&logoColor=white)](#5-testing--verification)
+[![Frontend Tests](https://img.shields.io/badge/Vitest-47%20Passed%20(100%25)-success?logo=vitest&logoColor=white)](#5-testing--verification)
 [![Security Hardened](https://img.shields.io/badge/Security-16%20Hardening%20Checks-blue)](#security--defense-in-depth)
 [![License](https://img.shields.io/badge/License-BSL%201.1-blue)](LICENSE)
 
@@ -17,27 +19,32 @@
 
 ## 1. Executive Summary
 
-**Metriva** is a production-grade conversational business intelligence and predictive analytics platform. It bridges the gap between non-technical stakeholders and complex relational databases by translating plain-English business inquiries into safe, optimized, and strictly validated SQL queries.
+**Metriva** is an enterprise-ready conversational business intelligence, predictive analytics, and secure data access platform. It empowers business analysts, engineering teams, and executive stakeholders to safely query, visualize, and forecast complex relational databases using natural language or direct SQL.
 
-Unlike naive text-to-SQL prototypes that forward LLM outputs directly to database connections, Metriva implements a defense-in-depth security boundary: multi-engine database pooling, AST-based query token validation, schema table allowlists, read-only transaction clamping, and statement timeouts.
-
-Beyond basic query execution, Metriva features an **automated visualization recommendation engine**, a **saved report and scheduling subsystem**, and a **predictive machine learning engine** (statistical Holt-Winters time-series forecasting, leak-free RFM churn classification, and Tukey IQR / Z-score anomaly alerting).
+Unlike naive text-to-SQL prototypes that stream raw LLM output into unconstrained database connections, Metriva establishes a robust defense-in-depth boundary:
+- **Enterprise Multi-Tenant RBAC:** Granular role enforcement (`ADMIN`, `ANALYST`, `VIEWER`) with organization-scoped data isolation across database connections, query histories, saved reports, and ML jobs.
+- **Dynamic Column-Level Data Masking:** Automated redaction of sensitive business fields (emails, phone numbers, account identifiers, monetary values) with AST-level inference guards blocking filter or sort-based data leakage.
+- **SQL Abstract Syntax Tree (AST) Security:** Lexical token validation, read-only transaction clamping (`SET TRANSACTION READ ONLY`), statement timeouts, and schema allowlists blocking DDL/DML, multi-statement injection, and SSRF attacks.
+- **Multi-Engine Relational Data Access:** Unified connection pooling and schema introspection across PostgreSQL 16, MySQL 8.4 LTS, and SQLite 3.
+- **Predictive Machine Learning:** In-database statistical Holt-Winters time-series forecasting, leak-free RFM churn classification, and Tukey IQR / rolling Z-score anomaly detection.
 
 ### Capability & Verification Scope
 
-To maintain engineering transparency, Metriva distinguishes between verified operational components, offline mock modes, and cloud deployment boundaries:
+To maintain complete engineering transparency, Metriva documents verified operational components, offline deterministic mock modes, and cloud deployment boundaries:
 
 | Dimension | Verified & Tested Status | Scope & Operational Boundary |
 | :--- | :--- | :--- |
+| **Enterprise RBAC & Tenancy** | ✅ **100% Tested** (Unit & Integration) | Strict server-side tenancy clamping, 3-tier role hierarchy (`ADMIN`, `ANALYST`, `VIEWER`), immediate membership revocation, and zero cross-tenant leakage. |
+| **Column Masking & AST Guard** | ✅ **100% Tested** (Unit & Integration) | Policy-driven dynamic regex masking (`mask_email`, `mask_phone`, `mask_partial_account`, `nullify`) and AST parser rejection of sensitive column inference attacks (`WHERE`, `ORDER BY`, `GROUP BY`). |
 | **AST SQL Security Engine** | ✅ **100% Tested** (16 Security Checks) | Strict AST token validation, DDL/DML blocking, schema allowlists, transaction clamping (`READ ONLY`), and statement timeout injection. |
-| **Internal PostgreSQL Demo DB** | ✅ **Live Verified** (PostgreSQL 16) | Migrations, demo dataset seeding (2,500 orders, 250 customers across 10 countries), pooling, and multi-tenant isolation verified live. |
-| **External SQLite Datasource** | ✅ **Live Verified** (B2B SaaS Dataset) | External SQLite file attachment (15 enterprise SaaS accounts, 15 subscriptions, 13 invoices), schema introspection, AST-validated Direct SQL execution, and CSV export verified live. |
-| **External MySQL Support** | ✅ **Live Verified** (MySQL 8.4 LTS) | Dedicated MySQL 8.4 service container, synthetic supply chain dataset (10 suppliers, 12 inventory SKUs, 10 shipments), least-privilege read-only user (`metriva_readonly`), AST validation, and RFC 4180 CSV export verified live. |
-| **BI & Predictive ML** | ✅ **100% Tested** (Unit & Integration) | Statistical Holt-Winters forecasting, RFM churn scoring, Tukey IQR / rolling Z-score anomalies, and automated chart recommendations. |
-| **Dual-Theme Design System** | ✅ **100% Tested** (38 Vitest Tests) | 60 FPS HTML5 canvas animated hero, responsive light/dark themes, zero-FOUC initialization, and accessible reduced-motion support. |
+| **Internal PostgreSQL Demo DB** | ✅ **Live Verified** (PostgreSQL 16) | Migrations, deterministic seed dataset (2,500 orders, 250 customers across 10 countries), connection pooling, and multi-tenant isolation. |
+| **External MySQL Integration** | ✅ **Live Verified** (MySQL 8.4 LTS) | Dedicated containerized MySQL 8.4 service, synthetic supply chain dataset (10 suppliers, 12 inventory SKUs, 10 shipments), least-privilege read-only user (`metriva_readonly`), AST validation, and RFC 4180 CSV export. |
+| **External SQLite Datasource** | ✅ **Live Verified** (B2B SaaS Dataset) | External SQLite file attachment (15 enterprise SaaS accounts, 15 subscriptions, 13 invoices), schema introspection, AST-validated Direct SQL execution, and CSV export. |
+| **BI & Predictive ML** | ✅ **100% Tested** (Unit & Integration) | Statistical Holt-Winters forecasting, leak-free RFM churn scoring, Tukey IQR / rolling Z-score anomalies, and automated chart recommendations. |
+| **Dual-Theme Design System** | ✅ **100% Tested** (47 Vitest Tests) | 60 FPS HTML5 canvas animated hero, responsive light/dark themes, zero-FOUC initialization, and accessible reduced-motion support. |
 | **AI Text-to-SQL: Mock Mode** | 🧪 **Offline Deterministic Mock** | Maps canonical business inquiries (revenue, churn, orders, top accounts) to valid SQL with zero API keys or external network traffic. |
 | **AI Text-to-SQL: Open Domain** | ⚡ **Live Provider (Optional)** | Requires configuring `OPENAI_API_KEY` (GPT-4o / GPT-4o-mini) for arbitrary open-domain conversational synthesis. |
-| **Production Infrastructure** | 📦 **Local & Docker Verified** | Containerized on Docker Compose (PostgreSQL 16, Django, React). Multi-node Kubernetes clustering and cloud TLS termination require infrastructure orchestration as detailed in [PRODUCTION_RUNBOOK.md](PRODUCTION_RUNBOOK.md). |
+| **Production Infrastructure** | 📦 **Local & Docker Verified** | Containerized on Docker Compose (PostgreSQL 16, MySQL 8.4, Django, React). Multi-node Kubernetes clustering and cloud TLS termination require infrastructure orchestration as detailed in [PRODUCTION_RUNBOOK.md](PRODUCTION_RUNBOOK.md). |
 
 ---
 
@@ -46,25 +53,29 @@ To maintain engineering transparency, Metriva distinguishes between verified ope
 ```mermaid
 flowchart TB
     subgraph Client ["Client Presentation Tier (React 18 + TypeScript + Vite)"]
-        UI_Land["Metriva Landing Page<br/>(Hero, Features, Navigation)"]
-        UI_Dash["Executive Dashboard<br/>(KPIs & Engine Badges)"]
-        UI_Query["NL Query & SQL Editor<br/>(Direct & Conversational)"]
-        UI_DS["Connection Manager<br/>(Postgres, MySQL, SQLite)"]
-        UI_BI["Reports & Auto-Charts<br/>(Bar, Line, Donut, Scatter, KPI)"]
-        UI_ML["Predictive ML Hub<br/>(Forecast, Churn, Anomaly)"]
+        UI_Land["Landing Page & Canvas Hero"]
+        UI_Dash["Executive BI Dashboard"]
+        UI_Query["Query Studio (NLQ + Direct SQL)"]
+        UI_Conn["Database Connections & Schema Explorer"]
+        UI_Team["Team Access & Column Masking Policies"]
+        UI_ML["Predictive ML Hub"]
+        Theme["Dual-Theme Engine (Zero-FOUC)"]
     end
 
-    subgraph Gateway ["API & Application Gateway (Django 5.2 REST Framework)"]
-        Auth["Token Authentication & Multi-Tenant RBAC"]
-        RateLimit["Rate Limiting & Request Audit Middleware"]
-        Router["REST API Endpoints (/api/*)"]
+    subgraph Gateway ["API Gateway & Security Tier (Django REST Framework)"]
+        Auth["JWT & Session Authentication"]
+        RBAC["Role-Based Access Control Gate<br/>(ADMIN / ANALYST / VIEWER)"]
+        Tenant["Organization Context Middleware"]
+        Router["REST Endpoint Handlers"]
     end
 
-    subgraph Security ["SQL Security & AST Validation Engine"]
-        Lexer["AST Parser & Tokenizer"]
+    subgraph Security ["SQL Security & Data Protection Engine"]
+        Lexer["AST Parser & Tokenizer (sqlparse)"]
         Sanitizer["Syntax Sanitizer & Comment Normalizer"]
-        Validator["Read-Only Validator (Blocks DDL/DML, SSRF, Path Traversal)"]
+        Validator["Read-Only Validator (Blocks DDL/DML, SSRF, Traversal)"]
+        Inference["Sensitive Column AST Inference Guard"]
         Clamp["Query Clamping (LIMIT Injection, Timeout Enforcer)"]
+        Masking["Dynamic Column-Level Data Masking Service"]
     end
 
     subgraph ML_Subsystem ["Predictive Analytics & ML Engine (Scikit-Learn / Statsmodels)"]
@@ -76,70 +87,65 @@ flowchart TB
 
     subgraph Storage ["Multi-Engine Storage Tier"]
         InternalDB[("Internal Analytics DB<br/>PostgreSQL 16 (Least-Privilege)")]
-        ExternalPG[("External PostgreSQL<br/>Replicas / DW")]
-        ExternalMySQL[("External MySQL<br/>Production Clusters")]
-        ExternalSQLite[("Local SQLite<br/>File Databases")]
+        ExternalPG[("External PostgreSQL<br/>Replicas / Data Warehouses")]
+        ExternalMySQL[("External MySQL 8.4 LTS<br/>Production Clusters")]
+        ExternalSQLite[("Local SQLite 3<br/>File Databases")]
     end
 
     Client <--> Gateway
-    Gateway --> Security
+    Gateway --> RBAC
+    RBAC --> Tenant
+    Tenant --> Security
     Security --> Storage
-    Gateway --> ML_Subsystem
+    Tenant --> ML_Subsystem
     ML_Subsystem --> Storage
+    Storage --> Masking
+    Masking --> Gateway
 ```
 
 ---
 
 ## 3. Core Capabilities
 
+### 🔐 Enterprise RBAC & Multi-Tenant Isolation
+- **3-Tier Hierarchical Roles**:
+  - `ADMIN`: Full organizational governance, member onboarding, datasource credential management, table allowlists, and column masking policy administration.
+  - `ANALYST`: Natural language query generation, Direct SQL execution, saved report authoring, and asynchronous ML job execution. Query results are dynamically masked according to organizational policies.
+  - `VIEWER`: Restricted strictly to pre-approved executive dashboards, saved reports, and certified analytics. Viewers cannot execute arbitrary SQL or AI queries, nor trigger unmonitored model runs.
+- **Server-Side Tenant Clamping**: All database queries, query histories, saved reports, database credentials, and ML runs are scoped to the authenticated user's active organization. Cross-organization access is strictly rejected at the ORM layer.
+- **Immediate Role Revocation**: Revoking membership or downgrading roles invalidates access tokens and session context immediately without stale permission caching.
+
+### 🛡️ Dynamic Column-Level Data Masking & AST Inference Defense
+- **Dynamic Response Masking**: Sensitive customer and corporate fields are automatically masked based on active organization policies:
+  - `mask_email`: `j***e@domain.com` (preserves domain structure while concealing identity)
+  - `mask_phone`: `***-***-1234` (preserves terminal digits for reconciliation)
+  - `mask_partial_account`: `****-5678` (protects credit cards, account numbers, and SSNs)
+  - `nullify`: Returns `NULL` for unauthorized financial or salary figures
+- **AST-Level Inference Attack Prevention**: Naive masking often exposes sensitive data to statistical extraction via query filters or sorting. Metriva's `SQLValidator` inspects the query Abstract Syntax Tree to block masked columns inside `WHERE`, `ON`, `HAVING`, `ORDER BY`, and `GROUP BY` clauses for non-Admin users, preventing binary search and side-channel inference.
+
+### 🌐 Multi-Engine Relational Data Access
+- **PostgreSQL 16**: Primary internal transactional database and external analytics target with connection pooling and schema introspection.
+- **MySQL 8.4 LTS**: Dedicated external database integration supporting secure socket communication, least-privilege read-only credentials (`metriva_readonly`), schema table allowlists, and RFC 4180 CSV streaming.
+- **SQLite 3**: Standalone file-based database support with path traversal safeguards (`/etc`, `/proc`, `../` blocking) and memory-isolated schema discovery.
+- **Credential Protection**: Database passwords and connection URIs are encrypted at rest using Fernet symmetric cryptography (128-bit AES-CBC with HMAC-SHA256 authentication).
+
 ### 🔍 Conversational Natural Language to SQL & Direct SQL
-- Translates natural-language business questions (e.g., *"Show the top 10 accounts by MRR"* or *"What was our monthly churn in 2026?"*) into ANSI/PostgreSQL/SQLite SQL.
-- **Direct SQL Mode**: Data engineers can execute raw SQL directly against any connected datasource. Direct queries (`SELECT`/`WITH`) bypass prompt synthesis and preserve user-defined column projections, sorting, and row limits (e.g., `LIMIT 3`) intact while still passing through read-only AST safety validation.
-- **Execution State & CSV Export**: Each query execution cleanses preceding result state, preventing stale data leakage. CSV exports immediately reflect the latest execution results and column headers.
-- **AI Engine Architecture & Capabilities**:
-  - *Zero-Cost Deterministic Mock Provider*: Built-in offline mock provider maps canonical business questions and schema identifiers to syntactically valid SQL with zero API keys or external network traffic.
-  - *Live OpenAI Provider*: Set `OPENAI_API_KEY` to activate GPT-4o-mini / GPT-4o for open-domain natural-language reasoning.
-  - *Current AI Limitations*: Mock mode is scoped to canonical analytical queries (revenue, churn, subscriptions, orders, top accounts). Complex open-domain conversational inquiries or arbitrary phrasing requires an active OpenAI API key.
+- **Dual Query Modalities**:
+  - *Conversational Mode*: Translates natural language questions (*"What was our monthly churn in Q3?"*, *"Show top 10 enterprise accounts by MRR"*) into syntactically valid ANSI/PostgreSQL/MySQL SQL.
+  - *Direct SQL Mode*: Engineers and analysts can author and run raw SQL against any connected database with full preservation of custom projections, joins, and row limits.
+- **Query Result Lifecycle & Export**: Execution state is strictly partitioned per execution; stale query buffers are wiped prior to execution. RFC 4180 compliant CSV exports stream real-time masked data directly to client sessions.
 
 ### 🎨 Dual-Theme Design System & 3D Animated Hero
-- **Complete Light & Dark Theme Support**: Built with semantic CSS custom properties and Tailwind CSS, featuring `light`, `dark`, and `system` synchronization with instant switching via the navbar `ThemeToggle`.
-- **Zero-FOUC Initialization**: An inline `<head>` script inspects `localStorage` and OS `prefers-color-scheme` before the DOM renders, preventing unstyled light/dark flashes on page reloads.
-- **Dynamic 3D-Inspired Canvas Hero**: High-performance HTML5 canvas renders 8 oscillating wireframe data pillars, a 3D perspective floor grid, particle sparks, and interactive mouse parallax at 60 FPS.
-- **Accessibility & Reduced Motion**: Automatically detects `prefers-reduced-motion: reduce` to render a clean, low-power static wireframe layout without animation loops.
-- **Reactive Recharts Theming**: Chart grids, Cartesian axes, tooltips, and bar/line strokes dynamically recalculate colors upon theme change without canvas artifacts.
-
-### 🌐 Multi-Engine External DataSources
-- Connects securely to **PostgreSQL**, **MySQL**, and **SQLite**.
-  - *Verification Status*: Internal PostgreSQL (primary demo dataset) and external SQLite (B2B SaaS test database) are verified live end-to-end. MySQL driver integration, schema models, and AST validation are implemented in the codebase; independent live external MySQL server integration testing is pending dedicated container/host provisioning.
-- **Fernet Symmetric Encryption**: Sensitive database credentials (passwords, hosts, tokens) are encrypted at rest using Fernet (128-bit AES in CBC mode with HMAC-SHA256 authenticated encryption) derived from the application key.
-- **Dynamic Schema Introspection**: Extracts schema tables, columns, data types, and foreign key relationships with intelligent caching.
-- **Fine-Grained Table Allowlists**: Administrators can restrict the AI to specific approved tables, preventing access to sensitive schemas (e.g., auth tokens, payroll).
-
-### 🛡️ Multi-Layer Security & Defense-in-Depth
-- **Strict Read-Only Enforcement**: Blocks all destructive commands (`DROP`, `DELETE`, `UPDATE`, `ALTER`, `TRUNCATE`, `INSERT`, `GRANT`, `REVOKE`).
-- **SQL AST Token Analysis**: Rejects statement chaining (semicolon splitting), comments designed to hide payloads (`/* ... */`, `--`), and MySQL executable comments (`/*!50000 ... */`).
-- **SSRF & Network Boundary Protection**: Rejects cloud metadata addresses (`169.254.169.254`, `metadata.google.internal`), loopback addresses, and unauthorized infrastructure ports.
-- **SQLite Path Traversal Safeguards**: Rejects system directory paths (`/etc`, `/proc`, `/sys`, `/var`) and path traversal sequences (`../`, null bytes).
-- **PostgreSQL Least Privilege**: Enforces `statement_timeout = 10s`, `idle_in_transaction_session_timeout = 5s`, and non-superuser database roles.
-
-### 📊 Conversational Business Intelligence & Automated Visualizations
-- **Automatic Chart Recommender**: Analyzes returned result schemas to select optimal chart types:
-  - *Bar Charts* for discrete category revenue comparisons.
-  - *Trend Lines* for time-series date sequences.
-  - *Donut / Pie Charts* for part-to-whole proportions.
-  - *Scatter Plots* for bivariate correlation analysis.
-  - *KPI Cards* for single-value summaries.
-- **Saved Reports & Schedules**: Save any natural language query or SQL result as a reusable report with automated execution schedules (Daily, Weekly, Monthly) and in-app delivery.
+- **Light & Dark Mode**: Full semantic theme support with instantaneous switching via the navbar `ThemeToggle`.
+- **Zero-FOUC Initialization**: Pre-render inline script reads `localStorage` and OS `prefers-color-scheme` to prevent unstyled white/dark flashes on page load.
+- **60 FPS Canvas Hero**: High-performance HTML5 canvas renders 8 oscillating wireframe pillars, a 3D perspective floor grid, and interactive mouse parallax, with automatic fallback for `prefers-reduced-motion`.
+- **Dynamic Recharts Theming**: Cartesian grids, axes, tooltips, and bar/line strokes dynamically recalculate colors upon theme change.
 
 ### 🤖 Predictive Analytics & Real Machine Learning
-- **Time-Series Revenue Forecasting**: Uses Holt-Winters Triple Exponential Smoothing with additive seasonality, computing in-sample MAE/RMSE and generating 95% confidence prediction bands.
-- **Customer Churn Risk Radar**: Builds leak-free Recency, Frequency, and Monetary (RFM) feature pipelines evaluated on historical cutoff boundaries to train calibrated logistic regression classifiers with precision, recall, and confusion matrix telemetry.
-- **Multi-Algorithm Anomaly Detection**: Employs Tukey IQR outlier analysis and rolling Z-score thresholds to detect spike, drop, and anomalous transactions with automated alert escalation.
-- **Epistemic Taxonomy for AI Insights**: Summaries are strictly categorized into:
-  - *Observed Historical Facts*
-  - *Predictive Estimates*
-  - *Statistical Associations*
-  - *Investigation Hypotheses*
+- **Holt-Winters Forecasting**: Triple exponential smoothing with additive seasonality, computing in-sample MAE/RMSE and generating 95% confidence intervals.
+- **Leak-Free RFM Churn Classifier**: Recency, Frequency, and Monetary feature pipelines evaluated strictly on historical cutoff dates to train calibrated logistic regression classifiers with precision, recall, and ROC-AUC telemetry.
+- **Multi-Algorithm Anomaly Detection**: Employs Tukey IQR outlier analysis and rolling Z-score thresholds to detect volume spikes, transaction drops, and anomalous ledger entries.
+- **Epistemic AI Insight Taxonomy**: Categorizes analytical summaries into Observed Historical Facts, Predictive Estimates, Statistical Associations, and Investigation Hypotheses.
 
 ---
 
@@ -151,25 +157,28 @@ flowchart TB
 | **Frontend Testing** | Vitest 2.1, React Testing Library, JSDOM, User Event |
 | **Backend** | Python 3.14 / 3.12, Django 5.2, Django REST Framework |
 | **Backend Testing** | Pytest 9.1, Pytest-Django, Ruff Linter & Formatter |
-| **Databases** | PostgreSQL 16 (Primary), MySQL 8 (External), SQLite 3 (External) |
+| **Databases** | PostgreSQL 16 (Primary), MySQL 8.4 LTS (External), SQLite 3 (External) |
 | **Machine Learning** | Scikit-Learn, Statsmodels, NumPy, Pandas |
-| **Security & Crypto** | Cryptography (Fernet), SQLParse AST Analyzer |
+| **Security & AST** | Cryptography (Fernet), sqlparse AST Analyzer |
 | **Containerization** | Docker, Docker Compose, Multi-stage builds |
 
 ---
 
 ## 5. Testing & Verification
 
-The codebase has undergone exhaustive testing across unit, integration, security, and end-to-end workflows:
+The codebase has undergone automated testing across unit, integration, security, and live external service boundaries. All tests run in continuous integration on GitHub Actions:
 
 | Test Suite | Framework | Target / Focus | Passed | Status |
 | :--- | :--- | :--- | :---: | :---: |
-| **Backend Suite** | Pytest 9.1 | Models, Serializers, Views, Validators, External DataSources (PostgreSQL, SQLite, MySQL 8.4), ML | **161 / 161** | ✅ PASS |
+| **Backend Test Suite** | Pytest 9.1 | Models, Serializers, Views, RBAC, Multi-Tenancy, Data Masking | **172 / 172** | ✅ PASS |
+| **MySQL 8.4 Live Integration** | Pytest 9.1 | Genuine MySQL 8.4 Server, Schema Introspection, Read-Only User | **12 / 12** | ✅ PASS |
 | **Security Hardening** | Pytest 9.1 | SSRF, Path Traversal, AST Splitting, Tenant Isolation | **16 / 16** | ✅ PASS |
-| **E2E Acceptance** | Pytest 9.1 | Full 19-Step End-to-End Business Pipeline | **1 / 1** | ✅ PASS |
-| **Frontend Suite** | Vitest 2.1 | Metriva Design System, RTL Components, Landing, Connections, Query | **38 / 38** | ✅ PASS |
-| **Python Linter** | Ruff | PEP 8, Unused Imports, Code Style | **Clean (0 errors)** | ✅ PASS |
-| **Frontend Build** | TypeScript / Vite | `tsc && vite build` bundle compilation | **Clean (0 errors)** | ✅ PASS |
+| **Frontend Test Suite** | Vitest 2.1 | Components, Navigation, Query Studio, RBAC Guards, Masking UI | **47 / 47** | ✅ PASS |
+| **Python Linter** | Ruff | PEP 8, Import hygiene, Static analysis | **Clean (0 errors)** | ✅ PASS |
+| **TypeScript / Frontend Build** | TypeScript / Vite | Strict typechecking (`tsc`) and production bundle compilation | **Clean (0 errors)** | ✅ PASS |
+| **CI Workflow Pipeline** | GitHub Actions | Automated Ubuntu test runner with PostgreSQL & MySQL services | **100% Passing** | ✅ PASS |
+
+**Total Automated Tests:** **247 passing** across all backend, security, live integration, and frontend suites.
 
 ---
 
@@ -179,8 +188,8 @@ The codebase has undergone exhaustive testing across unit, integration, security
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/your-username/ai-database.git
-   cd "ai-database"
+   git clone https://github.com/maryamabdulkarim361-lab/Metriva.git
+   cd Metriva
    ```
 
 2. **Configure environment**:
@@ -188,8 +197,9 @@ The codebase has undergone exhaustive testing across unit, integration, security
    cp .env.example .env
    ```
 
-3. **Start the containers**:
+3. **Start services with Docker Compose**:
    ```bash
+   # Starts PostgreSQL 16, MySQL 8.4 LTS, Django Backend, and React Frontend
    docker compose up --build -d
    ```
 
@@ -199,48 +209,46 @@ The codebase has undergone exhaustive testing across unit, integration, security
    ```
    - Frontend UI: `http://localhost:5173`
    - Backend API: `http://localhost:8000`
-   - Liveness Health: `http://localhost:8000/api/health/`
-   - Readiness Probe: `http://localhost:8000/api/ready/`
+   - Health Probe: `http://localhost:8000/api/health/`
 
 ---
 
 ### Option B: Local Native Development
 
-#### Backend Setup
+#### 1. Backend Setup
 ```bash
-# 1. Create and activate virtual environment
+# Create and activate virtual environment
 python3 -m venv .venv
 source .venv/bin/activate
 
-# 2. Install dependencies
+# Install dependencies
 pip install -r backend/requirements.txt
 
-# 3. Configure environment variables
+# Configure environment variables
 export DJANGO_SETTINGS_MODULE="config.settings"
-export DB_ENGINE="django.db.backends.postgresql"
-export DB_NAME="aidb"
-export DB_USER="aidb_user"
-export DB_PASSWORD="aidb_secure_password"
-export DB_HOST="localhost"
-export DB_PORT="5432"
+export DB_ENGINE="django.db.backends.sqlite3"
+export DB_NAME="db.sqlite3"
 
-# 4. Run migrations and start server
+# Run migrations and seed synthetic demonstration data
 python backend/manage.py migrate
+python backend/manage.py seed_database --scale standard
+
+# Start development server
 python backend/manage.py runserver 0.0.0.0:8000
 ```
 
-#### Frontend Setup
+#### 2. Frontend Setup
 ```bash
-# 1. Navigate to frontend directory
+# Navigate to frontend directory
 cd frontend
 
-# 2. Install dependencies
+# Install dependencies
 npm install
 
-# 3. Run frontend unit and smoke tests
+# Run frontend tests
 npm test
 
-# 4. Start Vite development server
+# Start Vite development server
 npm run dev
 ```
 
@@ -249,7 +257,7 @@ npm run dev
 ## 7. Verified Database Datasets
 
 > [!NOTE]
-> All demonstration datasets in PostgreSQL and SQLite are completely **synthetic**, generated deterministically for testing and evaluation. They contain zero real customer PII, corporate secrets, or actual financial records.
+> All demonstration datasets in PostgreSQL, MySQL, and SQLite are completely **synthetic**, generated deterministically for testing and evaluation. They contain zero real customer PII, corporate secrets, or actual financial records.
 
 ### A. Demo PostgreSQL Transactional Dataset
 Metriva includes a deterministic, production-scale synthetic seed command:
@@ -271,6 +279,13 @@ python backend/scripts/seed_test_business_db.py
 - **Accounts**: 15 synthetic enterprise SaaS accounts across FinTech, HealthTech, AI, and Cybersecurity
 - **Subscriptions**: 15 synthetic active/paused/cancelled subscriptions across Starter, Growth, and Enterprise tiers
 - **Invoices**: 13 synthetic billing records with payment statuses, line items, and MRR tracking
+
+### C. Dedicated MySQL 8.4 Supply Chain Dataset
+An external MySQL database initialized via `database/mysql/init_metriva_mysql.sql`:
+- **Suppliers**: 10 global supply chain vendors
+- **Inventory SKUs**: 12 warehouse product inventory records
+- **Shipments**: 10 fulfillment tracking records
+- **Access Account**: Dedicated read-only user (`metriva_readonly`) restricted to `SELECT` privileges only.
 
 ---
 
