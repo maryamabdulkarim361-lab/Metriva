@@ -83,11 +83,51 @@ class RegisterSerializer(serializers.ModelSerializer):
         fields = ["id", "name", "email", "password"]
 
     def create(self, validated_data):
-        return User.objects.create_user(
+        user = User.objects.create_user(
             email=validated_data["email"],
             password=validated_data["password"],
             name=validated_data.get("name", ""),
         )
+        try:
+            import uuid
+
+            from django.utils.text import slugify
+
+            from apps.organizations.models import (
+                ColumnMaskingPolicy,
+                Organization,
+                OrganizationMembership,
+                RoleChoices,
+            )
+
+            org_name = f"{user.name}'s Workspace" if user.name else f"{user.email.split('@')[0]}'s Workspace"
+            base_slug = slugify(org_name) or "workspace"
+            slug = f"{base_slug}-{uuid.uuid4().hex[:6]}"
+            org = Organization.objects.create(name=org_name, slug=slug, is_active=True)
+            OrganizationMembership.objects.create(
+                organization=org,
+                user=user,
+                role=RoleChoices.ADMIN,
+            )
+            ColumnMaskingPolicy.objects.create(
+                organization=org,
+                rule_name="Mask Email Addresses",
+                match_type="EXACT",
+                match_pattern="email",
+                masking_type="EMAIL",
+                is_active=True,
+            )
+            ColumnMaskingPolicy.objects.create(
+                organization=org,
+                rule_name="Mask Phone Numbers",
+                match_type="EXACT",
+                match_pattern="phone",
+                masking_type="PHONE",
+                is_active=True,
+            )
+        except Exception:
+            pass
+        return user
 
 
 class LoginSerializer(serializers.Serializer):

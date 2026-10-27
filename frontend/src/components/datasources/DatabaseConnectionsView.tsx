@@ -126,8 +126,12 @@ export const DatabaseConnectionsView: React.FC<DatabaseConnectionsViewProps> = (
     setFormEngine(engine);
     if (engine === "postgresql") {
       setFormPort(5432);
+      if (formHost === "mysql") setFormHost("postgres");
     } else if (engine === "mysql") {
       setFormPort(3306);
+      if (formHost === "postgres" || formHost === "localhost") setFormHost("mysql");
+      if (!formDbName) setFormDbName("metriva_mysql_demo");
+      if (!formUsername) setFormUsername("metriva_readonly");
     }
   };
 
@@ -398,12 +402,12 @@ export const DatabaseConnectionsView: React.FC<DatabaseConnectionsViewProps> = (
                         </span>
 
                         {ds.is_active ? (
-                          <span className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800/40">
+                          <span className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800/40" title="Connection is enabled in Metriva">
                             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse" />
                             Active
                           </span>
                         ) : (
-                          <span className="text-[11px] font-medium text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">
+                          <span className="text-[11px] font-medium text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded" title="Connection is disabled">
                             Disabled
                           </span>
                         )}
@@ -502,7 +506,23 @@ export const DatabaseConnectionsView: React.FC<DatabaseConnectionsViewProps> = (
               </button>
             </div>
 
-            <form onSubmit={handleSaveDataSource} className="p-6 space-y-4">
+            <form onSubmit={handleSaveDataSource} autoComplete="off" className="p-6 space-y-4">
+              {/* Notice Banner: Clearly Distinguishes DB Credentials from Metriva Web Login */}
+              <div className="p-3.5 rounded-xl bg-cyan-50/70 dark:bg-cyan-950/30 border border-cyan-200 dark:border-cyan-800/60 text-xs text-cyan-900 dark:text-cyan-200 flex items-start gap-2.5">
+                <span className="text-base select-none">💡</span>
+                <div className="space-y-0.5">
+                  <div className="font-semibold text-cyan-950 dark:text-cyan-100">Database Engine Credentials</div>
+                  <div>
+                    Enter credentials for your external database (e.g. <code>metriva_readonly</code>), <strong>not</strong> your Metriva application web login email.
+                  </div>
+                  {formEngine === "mysql" && (
+                    <div className="text-[11px] text-cyan-700 dark:text-cyan-400 font-mono mt-0.5">
+                      Docker host: "mysql" | Mac host: "host.docker.internal" | Local: "localhost"
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {/* Engine Selector */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
@@ -587,10 +607,16 @@ export const DatabaseConnectionsView: React.FC<DatabaseConnectionsViewProps> = (
               {formEngine !== "sqlite" && (
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Username</label>
+                    <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                      Database User (DB Role)
+                    </label>
                     <input
                       type="text"
-                      placeholder="read_only_user"
+                      name="db_account_user"
+                      autoComplete="off"
+                      data-lpignore="true"
+                      data-1p-ignore="true"
+                      placeholder={formEngine === "mysql" ? "metriva_readonly" : "postgres"}
                       value={formUsername}
                       onChange={(e) => setFormUsername(e.target.value)}
                       className="w-full px-3.5 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:border-cyan-500"
@@ -598,12 +624,16 @@ export const DatabaseConnectionsView: React.FC<DatabaseConnectionsViewProps> = (
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-                      {editingDs ? "Password (leave blank to keep)" : "Password"}
+                      {editingDs ? "Database Password (leave blank to keep)" : "Database Password"}
                     </label>
                     <div className="relative">
                       <input
                         type={showPassword ? "text" : "password"}
-                        placeholder={editingDs ? "••••••••" : "Password"}
+                        name="db_account_secret"
+                        autoComplete="new-password"
+                        data-lpignore="true"
+                        data-1p-ignore="true"
+                        placeholder={editingDs ? "••••••••" : "••••••••"}
                         value={formPassword}
                         onChange={(e) => setFormPassword(e.target.value)}
                         className="w-full px-3.5 py-2 pr-9 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:border-cyan-500"
