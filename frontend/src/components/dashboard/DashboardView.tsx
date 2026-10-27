@@ -114,9 +114,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <MetrivaBadge variant="cyan" size="sm" pulse>
               Live
             </MetrivaBadge>
+            <MetrivaBadge variant="purple" size="sm">
+              Synthetic Demo Dataset
+            </MetrivaBadge>
           </div>
           <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-            Real-time business performance derived directly from PostgreSQL transactions.
+            Pre-seeded synthetic enterprise benchmark derived directly from PostgreSQL demo transactions.
           </p>
         </div>
 

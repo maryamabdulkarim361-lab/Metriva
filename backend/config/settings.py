@@ -203,6 +203,11 @@ CORS_ALLOWED_ORIGINS = [
 ]
 CORS_ALLOW_CREDENTIALS = True
 
+# Frontend Application URL (for Django Admin "VIEW SITE" link and client redirects)
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173/").strip()
+if not FRONTEND_URL.endswith("/"):
+    FRONTEND_URL = f"{FRONTEND_URL}/"
+
 # AI & Query Execution Limits
 MAX_ROWS = int(os.environ.get("MAX_ROWS", "1000"))
 MAX_QUERY_SECONDS = int(os.environ.get("MAX_QUERY_SECONDS", "10"))

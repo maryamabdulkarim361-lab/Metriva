@@ -1,10 +1,17 @@
 """Root URL Configuration for AI Database Assistant."""
 
+from django.conf import settings
 from django.contrib import admin
 from django.urls import include, path
 
 from apps.core.health_views import health_liveness, health_readiness
 from apps.core.responses import api_response
+
+# Configure Django Admin Portal to link directly to the Metriva React Frontend
+admin.site.site_url = getattr(settings, "FRONTEND_URL", "http://localhost:5173/")
+admin.site.site_header = "Metriva Administration"
+admin.site.site_title = "Metriva Admin Portal"
+admin.site.index_title = "Metriva System Administration"
 
 
 def api_root(request):

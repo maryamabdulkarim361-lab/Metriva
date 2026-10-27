@@ -169,6 +169,10 @@ export const api = {
 
   logout: (): void => {
     setAuthToken(null);
+    setActiveOrgId(null);
+    if (typeof localStorage !== "undefined") {
+      localStorage.removeItem("metriva_selected_datasource_id");
+    }
   },
 
   // Dashboard & Metrics

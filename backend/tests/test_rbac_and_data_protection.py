@@ -574,3 +574,71 @@ class TestASTInferenceRiskDefense:
         assert res.is_valid is True
         assert res.error_code is None
 
+
+@pytest.mark.django_db
+class TestDjangoAdminViewSiteAndDataIsolation:
+    """Validate Django admin VIEW SITE configuration and multi-tenant isolation guarantees."""
+
+    def test_django_admin_site_url_points_to_frontend(self):
+        from django.conf import settings
+        from django.contrib import admin
+
+        assert hasattr(settings, "FRONTEND_URL")
+        assert admin.site.site_url == settings.FRONTEND_URL
+        assert admin.site.site_url.startswith("http://") or admin.site.site_url.startswith("https://")
+        assert admin.site.site_url.endswith("/")
+
+    def test_dashboard_marks_synthetic_demo_benchmark(self, api_client):
+        res = api_client.get("/api/dashboard/")
+        assert res.status_code == status.HTTP_200_OK
+        data = res.json()["data"]
+        assert data.get("is_synthetic_demo") is True
+        assert "Synthetic" in data.get("demo_dataset_description", "")
+
+    def test_cross_tenant_datasource_access_strictly_isolated(self, api_client):
+        # Create Org A with an Admin user and a private datasource
+        org_a = Organization.objects.create(name="Tenant Alpha", slug="tenant-alpha-iso", is_active=True)
+        user_a = User.objects.create_user(email="alpha_admin@example.com", password="PassWord123!", name="Alpha Admin")
+        OrganizationMembership.objects.create(organization=org_a, user=user_a, role=RoleChoices.ADMIN)
+        ds_a = DataSource.objects.create(
+            name="Alpha Private DB",
+            engine=DataSourceEngine.SQLITE,
+            organization=org_a,
+            user=user_a,
+            database_name="/tmp/alpha.db",
+            is_active=True,
+        )
+
+        # Create Org B with an Admin user
+        org_b = Organization.objects.create(name="Tenant Beta", slug="tenant-beta-iso", is_active=True)
+        user_b = User.objects.create_user(email="beta_admin@example.com", password="PassWord123!", name="Beta Admin")
+        OrganizationMembership.objects.create(organization=org_b, user=user_b, role=RoleChoices.ADMIN)
+
+        # Authenticate as User B (active in Org B)
+        api_client.force_authenticate(user=user_b)
+        api_client.credentials(HTTP_X_ORGANIZATION_ID=str(org_b.id))
+
+        # 1. User B cannot see Org A's datasource in list
+        list_res = api_client.get("/api/datasources/")
+        assert list_res.status_code == status.HTTP_200_OK
+        visible_ids = [d["id"] for d in list_res.json()["data"]]
+        assert ds_a.id not in visible_ids
+
+        # 2. User B cannot retrieve Org A's datasource details
+        detail_res = api_client.get(f"/api/datasources/{ds_a.id}/")
+        assert detail_res.status_code == status.HTTP_404_NOT_FOUND
+
+        # 3. User B cannot trigger connection test on Org A's datasource
+        test_res = api_client.post(f"/api/datasources/{ds_a.id}/test/")
+        assert test_res.status_code == status.HTTP_404_NOT_FOUND
+
+        # 4. User B cannot execute Direct SQL on Org A's datasource
+        query_res = api_client.post(
+            "/api/query/execute-direct/",
+            {"sql": "SELECT 1;", "data_source_id": ds_a.id},
+            format="json",
+        )
+        assert query_res.status_code == status.HTTP_404_NOT_FOUND
+        assert query_res.json()["error"]["code"] == "DATA_SOURCE_NOT_FOUND"
+
+

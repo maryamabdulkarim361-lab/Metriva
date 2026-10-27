@@ -48,6 +48,7 @@ services:
       DEBUG: "True"
       SECRET_KEY: "django-insecure-docker-dev-key-change-in-production"
       DATABASE_URL: "postgresql://postgres:postgrespassword@postgres:5432/aidb"
+      FRONTEND_URL: "${FRONTEND_URL:-http://localhost:5173/}"
       OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
       OPENAI_MODEL: "${OPENAI_MODEL:-gpt-4o-mini}"
       MAX_ROWS: "1000"

@@ -267,6 +267,10 @@ class DashboardSummaryView(APIView):
 
         return api_response(
             data={
+                "is_synthetic_demo": True,
+                "demo_dataset_description": (
+                    "Synthetic E-Commerce Benchmark Dataset (250 customers, 2,500 orders)"
+                ),
                 "kpis": {
                     "total_customers": total_customers,
                     "total_orders": total_orders,

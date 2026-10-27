@@ -313,6 +313,9 @@ export const App: React.FC<AppProps> = ({ initialView, initialTab = "dashboard" 
         onClose={() => setIsAuthModalOpen(false)}
         onSuccess={(user) => {
           setCurrentUser(user);
+          if (user?.active_organization?.id) {
+            setActiveOrgId(user.active_organization.id);
+          }
           refreshDashboard();
         }}
       />
