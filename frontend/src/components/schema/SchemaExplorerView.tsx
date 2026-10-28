@@ -9,29 +9,64 @@ import {
   TableProperties,
 } from "lucide-react";
 import { api } from "../../services/api";
-import { SchemaMetadata, SchemaTable } from "../../types";
+import { DataSource, SchemaMetadata, SchemaTable } from "../../types";
 import { MetrivaCard, MetrivaBadge, MetrivaButton, METRIVA_TOKENS } from "../../design-system";
 
-export const SchemaExplorerView: React.FC = () => {
+interface SchemaExplorerViewProps {
+  onNavigateToDataSources?: () => void;
+}
+
+export const SchemaExplorerView: React.FC<SchemaExplorerViewProps> = ({
+  onNavigateToDataSources,
+}) => {
   const [schema, setSchema] = useState<SchemaMetadata | null>(null);
   const [selectedTable, setSelectedTable] = useState<SchemaTable | null>(null);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<"tables" | "diagram">("tables");
+  const [dataSources, setDataSources] = useState<DataSource[]>([]);
+  const [selectedDataSourceId, setSelectedDataSourceId] = useState<number | null>(null);
+  const [isSampleMode, setIsSampleMode] = useState<boolean>(false);
 
-  useEffect(() => {
+  const loadSchema = (dsId: number | null, sample: boolean) => {
+    setLoading(true);
     api
-      .getSchemaMetadata()
+      .getSchemaMetadata({ dataSourceId: dsId, sample })
       .then((data) => {
         setSchema(data);
         if (data.tables && data.tables.length > 0) {
           setSelectedTable(data.tables[0]);
+        } else {
+          setSelectedTable(null);
         }
       })
       .catch((err) => console.error("Failed to load schema:", err))
       .finally(() => setLoading(false));
+  };
+
+  const loadDataSourcesAndSchema = async () => {
+    setLoading(true);
+    try {
+      const dss = await api.getDataSources();
+      const activeDss = (dss || []).filter((d) => d.is_active);
+      setDataSources(activeDss);
+      if (activeDss.length > 0) {
+        setSelectedDataSourceId(activeDss[0].id);
+        loadSchema(activeDss[0].id, false);
+      } else {
+        setSelectedDataSourceId(null);
+        loadSchema(null, false);
+      }
+    } catch (err) {
+      console.error("Failed to load datasources:", err);
+      loadSchema(null, false);
+    }
+  };
+
+  useEffect(() => {
+    loadDataSourcesAndSchema();
   }, []);
 
-  if (loading || !schema) {
+  if (loading && !schema) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div
@@ -42,8 +77,109 @@ export const SchemaExplorerView: React.FC = () => {
     );
   }
 
+  // Empty state for workspaces with 0 connected datasources (not in sample mode)
+  if (!isSampleMode && schema?.has_connected_datasources === false && dataSources.length === 0) {
+    return (
+      <div className="space-y-6 pb-16 max-w-4xl mx-auto my-6">
+        <MetrivaCard variant="glass" className="p-8 sm:p-10 text-center relative overflow-hidden shadow-xl border-dashed">
+          <div className="mx-auto w-16 h-16 rounded-2xl bg-gradient-to-tr from-cyan-500/20 to-blue-500/20 border border-cyan-500/30 flex items-center justify-center text-cyan-600 dark:text-cyan-400 mb-5 shadow-lg shadow-cyan-500/10">
+            <Database className="h-8 w-8" />
+          </div>
+
+          <MetrivaBadge variant="cyan" size="sm" className="mb-3">
+            Schema Introspection
+          </MetrivaBadge>
+
+          <h3 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
+            No Database Connected
+          </h3>
+
+          <p className="text-sm text-slate-600 dark:text-slate-400 max-w-lg mx-auto mt-2 leading-relaxed">
+            Your workspace does not have any connected databases yet. Connect your PostgreSQL, MySQL, or SQLite database to introspect relational tables, columns, indexes, and foreign keys.
+          </p>
+
+          <div className="flex flex-wrap items-center justify-center gap-3.5 mt-6">
+            {onNavigateToDataSources && (
+              <MetrivaButton
+                onClick={onNavigateToDataSources}
+                size="md"
+                variant="primary"
+                icon={<Database className="h-4 w-4" />}
+              >
+                Connect a Database
+              </MetrivaButton>
+            )}
+            <MetrivaButton
+              onClick={() => {
+                setIsSampleMode(true);
+                loadSchema(null, true);
+              }}
+              size="md"
+              variant="secondary"
+              icon={<Layers className="h-4 w-4" />}
+            >
+              Explore Sample Demo Schema
+            </MetrivaButton>
+          </div>
+        </MetrivaCard>
+      </div>
+    );
+  }
+
+  const tables = schema?.tables || [];
+
   return (
     <div className="space-y-6 pb-16">
+      {/* Sample Schema Banner */}
+      {(isSampleMode || schema?.is_sample_schema) && (
+        <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-cyan-500/10 border border-amber-500/30 dark:border-amber-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 shrink-0">
+              <Layers className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300">
+                  Viewing Sample Demonstration Schema
+                </span>
+                <MetrivaBadge variant="amber" size="sm">Demo Preview</MetrivaBadge>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                Inspecting pre-seeded synthetic PostgreSQL schema. Connect your own database to introspect production tables.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+            {onNavigateToDataSources && (
+              <MetrivaButton
+                onClick={onNavigateToDataSources}
+                size="sm"
+                variant="primary"
+                icon={<Database className="h-3.5 w-3.5" />}
+              >
+                Connect Database
+              </MetrivaButton>
+            )}
+            <MetrivaButton
+              onClick={() => {
+                setIsSampleMode(false);
+                if (dataSources.length > 0) {
+                  setSelectedDataSourceId(dataSources[0].id);
+                  loadSchema(dataSources[0].id, false);
+                } else {
+                  loadSchema(null, false);
+                }
+              }}
+              size="sm"
+              variant="secondary"
+            >
+              Exit Sample Schema
+            </MetrivaButton>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -52,8 +188,13 @@ export const SchemaExplorerView: React.FC = () => {
               <Layers className="h-3 w-3 mr-1 inline" /> Schema Introspection
             </MetrivaBadge>
             <span className="text-xs text-slate-500 font-mono">
-              {schema.tables.length} tables cataloged
+              {tables.length} tables cataloged
             </span>
+            {schema?.database_name && (
+              <span className="text-xs text-slate-400 font-mono">
+                • DB: {schema.database_name}
+              </span>
+            )}
           </div>
           <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
             <TableProperties className="h-6 w-6 text-cyan-600 dark:text-cyan-400" />
@@ -88,6 +229,39 @@ export const SchemaExplorerView: React.FC = () => {
         </div>
       </div>
 
+      {/* Datasource Selector Dropdown when datasources exist */}
+      {dataSources.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2.5 bg-slate-100 dark:bg-slate-900/60 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800">
+          <Database className="h-4 w-4 text-cyan-600 dark:text-cyan-400 ml-1" />
+          <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Target Database:</span>
+          <select
+            value={selectedDataSourceId || ""}
+            onChange={(e) => {
+              const val = Number(e.target.value);
+              setSelectedDataSourceId(val);
+              setIsSampleMode(false);
+              loadSchema(val, false);
+            }}
+            className="text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-900 dark:text-white font-medium focus:ring-1 focus:ring-cyan-500"
+          >
+            {dataSources.map((ds) => (
+              <option key={ds.id} value={ds.id}>
+                {ds.name} ({ds.engine.toUpperCase()})
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={() => {
+              setIsSampleMode(true);
+              loadSchema(null, true);
+            }}
+            className="text-xs ml-auto text-cyan-600 dark:text-cyan-400 hover:underline px-2"
+          >
+            Preview Sample Demo Schema
+          </button>
+        </div>
+      )}
+
       {viewMode === "tables" ? (
         /* Split Tables Catalog View */
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -95,12 +269,12 @@ export const SchemaExplorerView: React.FC = () => {
           <div className="space-y-2">
             <div className="flex items-center justify-between px-1">
               <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                Tables ({schema.tables.length})
+                Tables ({tables.length})
               </span>
-              <span className="text-[11px] text-cyan-600 dark:text-cyan-400/80 font-mono">Normalized</span>
+              <span className="text-[11px] text-cyan-600 dark:text-cyan-400/80 font-mono">Cataloged</span>
             </div>
             <div className="space-y-1.5">
-              {schema.tables.map((table) => {
+              {tables.map((table) => {
                 const isSelected = selectedTable?.name === table.name;
                 return (
                   <button
@@ -131,6 +305,11 @@ export const SchemaExplorerView: React.FC = () => {
                   </button>
                 );
               })}
+              {tables.length === 0 && (
+                <div className="p-4 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 text-center text-xs text-slate-500">
+                  No tables discovered in this datasource.
+                </div>
+              )}
             </div>
           </div>
 

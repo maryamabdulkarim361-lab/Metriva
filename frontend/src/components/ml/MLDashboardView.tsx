@@ -11,8 +11,11 @@ import {
   ChevronRight,
   Clock,
   Cpu,
+  Database,
   DollarSign,
+  Eye,
   HelpCircle,
+  Info,
   Lightbulb,
   Play,
   RefreshCw,
@@ -54,7 +57,11 @@ import {
 import { MetrivaCard, MetrivaBadge, MetrivaButton, METRIVA_TOKENS } from "../../design-system";
 import { useTheme } from "../../theme/ThemeContext";
 
-export const MLDashboardView: React.FC = () => {
+export interface MLDashboardViewProps {
+  onNavigateToDataSources?: () => void;
+}
+
+export const MLDashboardView: React.FC<MLDashboardViewProps> = ({ onNavigateToDataSources }) => {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
 
@@ -70,6 +77,8 @@ export const MLDashboardView: React.FC = () => {
   const axisStroke = isDark ? "#64748b" : "#94a3b8";
 
   const [activeSubTab, setActiveSubTab] = useState<"forecast" | "churn" | "anomalies" | "registry">("forecast");
+  const [isSampleMode, setIsSampleMode] = useState<boolean>(false);
+  const [jobError, setJobError] = useState<string | null>(null);
 
   // Executive Insights
   const [insights, setInsights] = useState<MLInsights | null>(null);
@@ -100,10 +109,10 @@ export const MLDashboardView: React.FC = () => {
   const [selectedJobType, setSelectedJobType] = useState<string>("TRAIN_FORECAST");
 
   // Load Executive Insights
-  const fetchInsights = async () => {
+  const fetchInsights = async (sample: boolean = isSampleMode) => {
     setLoadingInsights(true);
     try {
-      const data = await api.getMLInsights();
+      const data = await api.getMLInsights({ sample });
       setInsights(data);
     } catch (err) {
       console.error("Failed to load ML insights:", err);
@@ -113,12 +122,13 @@ export const MLDashboardView: React.FC = () => {
   };
 
   // Load Forecast
-  const fetchForecast = async () => {
+  const fetchForecast = async (sample: boolean = isSampleMode) => {
     setLoadingForecast(true);
     try {
       const data = await api.getRevenueForecast({
         aggregation: forecastAggregation,
         horizon: forecastHorizon,
+        sample,
       });
       setForecastData(data);
     } catch (err) {
@@ -129,10 +139,10 @@ export const MLDashboardView: React.FC = () => {
   };
 
   // Load Churn
-  const fetchChurn = async () => {
+  const fetchChurn = async (sample: boolean = isSampleMode) => {
     setLoadingChurn(true);
     try {
-      const data = await api.getCustomerChurn(churnInactivityDays);
+      const data = await api.getCustomerChurn({ inactivityDays: churnInactivityDays, sample });
       setChurnData(data);
     } catch (err) {
       console.error("Failed to load churn prediction:", err);
@@ -142,11 +152,11 @@ export const MLDashboardView: React.FC = () => {
   };
 
   // Load Anomalies
-  const fetchAnomalies = async () => {
+  const fetchAnomalies = async (sample: boolean = isSampleMode) => {
     setLoadingAnomalies(true);
     try {
       const [scanRes, alertsRes] = await Promise.all([
-        api.getAnomalyScan(anomalyZThreshold),
+        api.getAnomalyScan({ zThreshold: anomalyZThreshold, sample }),
         api.getAnomalyAlerts(),
       ]);
       setAnomalyScan(scanRes);
@@ -173,15 +183,23 @@ export const MLDashboardView: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchInsights();
-  }, []);
+    fetchInsights(isSampleMode);
+  }, [isSampleMode]);
 
   useEffect(() => {
-    if (activeSubTab === "forecast") fetchForecast();
-    if (activeSubTab === "churn") fetchChurn();
-    if (activeSubTab === "anomalies") fetchAnomalies();
+    if (activeSubTab === "forecast") fetchForecast(isSampleMode);
+    if (activeSubTab === "churn") fetchChurn(isSampleMode);
+    if (activeSubTab === "anomalies") fetchAnomalies(isSampleMode);
     if (activeSubTab === "registry") fetchRegistry();
-  }, [activeSubTab, forecastAggregation, forecastHorizon, churnInactivityDays, anomalyZThreshold]);
+  }, [activeSubTab, forecastAggregation, forecastHorizon, churnInactivityDays, anomalyZThreshold, isSampleMode]);
+
+  const handleToggleSampleMode = (enable: boolean) => {
+    setIsSampleMode(enable);
+    fetchInsights(enable);
+    if (activeSubTab === "forecast") fetchForecast(enable);
+    if (activeSubTab === "churn") fetchChurn(enable);
+    if (activeSubTab === "anomalies") fetchAnomalies(enable);
+  };
 
   const handleAcknowledgeAlert = async (id: number) => {
     try {
@@ -196,11 +214,16 @@ export const MLDashboardView: React.FC = () => {
 
   const handleTriggerJob = async () => {
     setTriggeringJob(true);
+    setJobError(null);
     try {
       await api.triggerMLJob(selectedJobType);
       await fetchRegistry();
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to trigger job:", err);
+      setJobError(
+        err?.message ||
+          "Failed to trigger ML job: no authorized external business dataset is connected to this workspace."
+      );
     } finally {
       setTriggeringJob(false);
     }
@@ -328,8 +351,117 @@ export const MLDashboardView: React.FC = () => {
         </div>
       </div>
 
+      {/* Sample Exploration Mode Banner */}
+      {(isSampleMode || forecastData?.is_sample_view) && (
+        <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-cyan-500/10 border border-amber-500/30 dark:border-amber-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 shrink-0">
+              <Eye className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300">
+                  Sample Predictive Analytics Active
+                </span>
+                <MetrivaBadge variant="amber" size="sm">Demo Mode</MetrivaBadge>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                You are previewing synthetic machine learning predictions (Holt-Winters revenue forecasting, RFM customer churn probability, and Tukey IQR anomaly scans). Connect an external database to train models on your business data.
+              </p>
+              <div className="flex items-center gap-1.5 mt-1 text-[11px] text-amber-600/90 dark:text-amber-400/90 font-medium">
+                <Info className="h-3 w-3 shrink-0" />
+                <span>Model Calibration: Built-in models evaluate against standard 3NF transactional schemas (orders, customers, line items).</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+            {onNavigateToDataSources && (
+              <MetrivaButton
+                onClick={onNavigateToDataSources}
+                size="sm"
+                variant="primary"
+                icon={<Database className="h-3.5 w-3.5" />}
+              >
+                Connect Database
+              </MetrivaButton>
+            )}
+            <MetrivaButton
+              onClick={() => handleToggleSampleMode(false)}
+              size="sm"
+              variant="secondary"
+            >
+              Exit Sample Mode
+            </MetrivaButton>
+          </div>
+        </div>
+      )}
+
+      {/* Onboarding Empty State Card when workspace has 0 connected datasources and not in sample mode */}
+      {!loadingForecast &&
+        forecastData &&
+        forecastData.has_connected_datasources === false &&
+        !isSampleMode &&
+        activeSubTab !== "registry" && (
+          <div className="space-y-6 max-w-4xl mx-auto my-6">
+            <MetrivaCard variant="glass" className="p-8 sm:p-10 text-center relative overflow-hidden shadow-xl border-dashed">
+              <div className="mx-auto w-16 h-16 rounded-2xl bg-gradient-to-tr from-cyan-500/20 to-blue-500/20 border border-cyan-500/30 flex items-center justify-center text-cyan-600 dark:text-cyan-400 mb-5 shadow-lg shadow-cyan-500/10">
+                <Cpu className="h-8 w-8" />
+              </div>
+
+              <MetrivaBadge variant="cyan" size="sm" className="mb-3">
+                Statistical Intelligence
+              </MetrivaBadge>
+
+              <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+                Connect Your Database for Predictive Intelligence
+              </h2>
+
+              <p className="text-sm text-slate-600 dark:text-slate-400 max-w-xl mx-auto mt-2 leading-relaxed">
+                Metriva evaluates production-grade statistical models—including Holt-Winters linear trend forecasting, leak-free RFM churn classification, and Tukey IQR / Z-score anomaly scans—directly from your operational data.
+              </p>
+
+              <div className="flex flex-wrap items-center justify-center gap-3.5 mt-7">
+                {onNavigateToDataSources && (
+                  <MetrivaButton
+                    onClick={onNavigateToDataSources}
+                    variant="primary"
+                    icon={<Database className="h-4 w-4" />}
+                  >
+                    Connect Database
+                  </MetrivaButton>
+                )}
+                <MetrivaButton
+                  onClick={() => handleToggleSampleMode(true)}
+                  variant="secondary"
+                  icon={<Eye className="h-4 w-4" />}
+                >
+                  Explore Sample Forecasts & ML
+                </MetrivaButton>
+              </div>
+
+              <div className="mt-8 pt-6 border-t border-slate-200 dark:border-slate-800 text-left max-w-xl mx-auto space-y-3">
+                <div className="flex items-start gap-2.5">
+                  <Info className="h-4 w-4 text-cyan-600 dark:text-cyan-400 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <h4 className="text-xs font-semibold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
+                      Model Architecture & Schema Requirements
+                    </h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                      Metriva's built-in time-series and classification algorithms calibrate against normalized 3NF transactional schemas with customer, order, and line-item entities. Arbitrary connected databases (e.g. supply chain, inventory) provide full natural language querying and schema exploration, while automated ML pipeline execution requires compatible entity structures.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </MetrivaCard>
+          </div>
+        )}
+
       {/* Structured Executive AI Insights Briefing */}
-      {insights?.executive_summary && (
+      {insights?.executive_summary &&
+        (isSampleMode || (forecastData && forecastData.has_connected_datasources !== false)) &&
+        ((insights.executive_summary?.observed_historical_facts?.length ?? 0) > 0 ||
+          (insights.executive_summary?.predictive_estimates?.length ?? 0) > 0) && (
         <div className="rounded-2xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 p-5 shadow-xl space-y-4 transition-colors">
           <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
             <div className="flex items-center gap-2">
@@ -414,7 +546,7 @@ export const MLDashboardView: React.FC = () => {
       {/* ========================================================================= */}
       {/* SUB-TAB 1: REVENUE FORECASTING */}
       {/* ========================================================================= */}
-      {activeSubTab === "forecast" && (
+      {activeSubTab === "forecast" && (isSampleMode || !forecastData || forecastData.has_connected_datasources !== false) && (
         <div className="space-y-6">
           {/* Controls Bar */}
           <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800/80 flex flex-wrap items-center justify-between gap-4">
@@ -455,7 +587,7 @@ export const MLDashboardView: React.FC = () => {
             </div>
 
             <button
-              onClick={fetchForecast}
+              onClick={() => fetchForecast()}
               disabled={loadingForecast}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 rounded-lg transition shadow-sm"
             >
@@ -485,15 +617,17 @@ export const MLDashboardView: React.FC = () => {
                   <div className="text-[11px] text-cyan-600 dark:text-cyan-400 font-mono">v{forecastData.model_version}</div>
                 </div>
 
-                <div className="p-4 rounded-xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 space-y-1">
-                  <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">In-Sample Accuracy</div>
-                  <div className="text-base font-bold text-slate-900 dark:text-white font-mono">
-                    MAE: {formatCurrency(forecastData.evaluation_metrics.mae)}
+                {forecastData.evaluation_metrics && (
+                  <div className="p-4 rounded-xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 space-y-1">
+                    <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">In-Sample Accuracy</div>
+                    <div className="text-base font-bold text-slate-900 dark:text-white font-mono">
+                      MAE: {formatCurrency(forecastData.evaluation_metrics.mae)}
+                    </div>
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                      RMSE: {formatCurrency(forecastData.evaluation_metrics.rmse)}
+                    </div>
                   </div>
-                  <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
-                    RMSE: {formatCurrency(forecastData.evaluation_metrics.rmse)}
-                  </div>
-                </div>
+                )}
 
                 {forecastData.baseline_comparison && (
                   <div className="p-4 rounded-xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 space-y-1">
@@ -680,7 +814,7 @@ export const MLDashboardView: React.FC = () => {
       {/* ========================================================================= */}
       {/* SUB-TAB 2: CUSTOMER CHURN RADAR */}
       {/* ========================================================================= */}
-      {activeSubTab === "churn" && (
+      {activeSubTab === "churn" && (isSampleMode || !forecastData || forecastData.has_connected_datasources !== false) && (
         <div className="space-y-6">
           {/* Controls Bar */}
           <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800/80 flex flex-wrap items-center justify-between gap-4">
@@ -704,7 +838,7 @@ export const MLDashboardView: React.FC = () => {
             </div>
 
             <button
-              onClick={fetchChurn}
+              onClick={() => fetchChurn()}
               disabled={loadingChurn}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 rounded-lg transition"
             >
@@ -738,43 +872,49 @@ export const MLDashboardView: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="p-4 rounded-xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 space-y-1">
-                  <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Model Precision & Recall</div>
-                  <div className="text-base font-bold text-slate-900 dark:text-white font-mono">
-                    P: {(churnData.evaluation_metrics.precision * 100).toFixed(1)}% | R:{" "}
-                    {(churnData.evaluation_metrics.recall * 100).toFixed(1)}%
+                {churnData.evaluation_metrics && (
+                  <div className="p-4 rounded-xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 space-y-1">
+                    <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Model Precision & Recall</div>
+                    <div className="text-base font-bold text-slate-900 dark:text-white font-mono">
+                      P: {(churnData.evaluation_metrics.precision * 100).toFixed(1)}% | R:{" "}
+                      {(churnData.evaluation_metrics.recall * 100).toFixed(1)}%
+                    </div>
+                    <div className="text-[11px] text-cyan-600 dark:text-cyan-400 font-mono">
+                      F1 Score: {(churnData.evaluation_metrics.f1_score * 100).toFixed(1)}%
+                    </div>
                   </div>
-                  <div className="text-[11px] text-cyan-600 dark:text-cyan-400 font-mono">
-                    F1 Score: {(churnData.evaluation_metrics.f1_score * 100).toFixed(1)}%
-                  </div>
-                </div>
+                )}
 
-                <div className="p-4 rounded-xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 space-y-1">
-                  <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Confusion Matrix</div>
-                  <div className="text-xs font-mono text-slate-700 dark:text-slate-300">
-                    TP: {churnData.evaluation_metrics.confusion_matrix.tp} | FP:{" "}
-                    {churnData.evaluation_metrics.confusion_matrix.fp}
+                {churnData.evaluation_metrics && (
+                  <div className="p-4 rounded-xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 space-y-1">
+                    <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Confusion Matrix</div>
+                    <div className="text-xs font-mono text-slate-700 dark:text-slate-300">
+                      TP: {churnData.evaluation_metrics.confusion_matrix.tp} | FP:{" "}
+                      {churnData.evaluation_metrics.confusion_matrix.fp}
+                    </div>
+                    <div className="text-xs font-mono text-slate-500 dark:text-slate-400">
+                      TN: {churnData.evaluation_metrics.confusion_matrix.tn} | FN:{" "}
+                      {churnData.evaluation_metrics.confusion_matrix.fn}
+                    </div>
                   </div>
-                  <div className="text-xs font-mono text-slate-500 dark:text-slate-400">
-                    TN: {churnData.evaluation_metrics.confusion_matrix.tn} | FN:{" "}
-                    {churnData.evaluation_metrics.confusion_matrix.fn}
-                  </div>
-                </div>
+                )}
 
-                <div className="p-4 rounded-xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 space-y-1">
-                  <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Risk Distribution</div>
-                  <div className="flex items-center gap-2 pt-1">
-                    <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
-                      High: {churnData.risk_distribution.high_risk_count}
-                    </span>
-                    <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
-                      Med: {churnData.risk_distribution.medium_risk_count}
-                    </span>
-                    <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                      Low: {churnData.risk_distribution.low_risk_count}
-                    </span>
+                {churnData.risk_distribution && (
+                  <div className="p-4 rounded-xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 space-y-1">
+                    <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Risk Distribution</div>
+                    <div className="flex items-center gap-2 pt-1">
+                      <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
+                        High: {churnData.risk_distribution.high_risk_count}
+                      </span>
+                      <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                        Med: {churnData.risk_distribution.medium_risk_count}
+                      </span>
+                      <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                        Low: {churnData.risk_distribution.low_risk_count}
+                      </span>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
 
               {/* Feature Importance Weights */}
@@ -878,7 +1018,7 @@ export const MLDashboardView: React.FC = () => {
       {/* ========================================================================= */}
       {/* SUB-TAB 3: ANOMALY DETECTION */}
       {/* ========================================================================= */}
-      {activeSubTab === "anomalies" && (
+      {activeSubTab === "anomalies" && (isSampleMode || !forecastData || forecastData.has_connected_datasources !== false) && (
         <div className="space-y-6">
           {/* Controls Bar */}
           <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800/80 flex flex-wrap items-center justify-between gap-4">
@@ -902,7 +1042,7 @@ export const MLDashboardView: React.FC = () => {
             </div>
 
             <button
-              onClick={fetchAnomalies}
+              onClick={() => fetchAnomalies()}
               disabled={loadingAnomalies}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 rounded-lg transition"
             >
@@ -1057,6 +1197,33 @@ export const MLDashboardView: React.FC = () => {
               <span>Refresh Registry</span>
             </button>
           </div>
+
+          {/* Workspace Empty State Warning in Registry */}
+          {forecastData && forecastData.has_connected_datasources === false && !isSampleMode && (
+            <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-700 dark:text-amber-300 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Info className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                <span>
+                  No connected external database. Background model training pipelines require a connected transactional dataset.
+                </span>
+              </div>
+              {onNavigateToDataSources && (
+                <button
+                  onClick={onNavigateToDataSources}
+                  className="text-xs font-semibold underline hover:no-underline shrink-0"
+                >
+                  Connect Database
+                </button>
+              )}
+            </div>
+          )}
+
+          {jobError && (
+            <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs text-rose-700 dark:text-rose-300 flex items-center gap-2">
+              <AlertOctagon className="h-4 w-4 shrink-0 text-rose-600 dark:text-rose-400" />
+              <span>{jobError}</span>
+            </div>
+          )}
 
           {loadingRegistry ? (
             <div className="flex items-center justify-center min-h-[300px] rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800">

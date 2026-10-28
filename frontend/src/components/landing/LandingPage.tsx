@@ -12,6 +12,7 @@ import { LandingFooter } from "./LandingFooter";
 interface LandingPageProps {
   onLaunchApp: () => void;
   onOpenAuth: () => void;
+  onLogout?: () => void;
   currentUser?: { name?: string; email?: string } | null;
   onNavigateToQueryWithPrompt: (prompt: string) => void;
 }
@@ -19,6 +20,7 @@ interface LandingPageProps {
 export const LandingPage: React.FC<LandingPageProps> = ({
   onLaunchApp,
   onOpenAuth,
+  onLogout,
   currentUser,
   onNavigateToQueryWithPrompt,
 }) => {
@@ -39,6 +41,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       <LandingNavbar
         onLaunchApp={onLaunchApp}
         onOpenAuth={onOpenAuth}
+        onLogout={onLogout}
         currentUser={currentUser}
       />
 

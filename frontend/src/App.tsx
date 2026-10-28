@@ -25,16 +25,17 @@ export const App: React.FC<AppProps> = ({ initialView, initialTab = "dashboard" 
   const [viewMode, setViewMode] = useState<"landing" | "app">(() => {
     if (initialView) return initialView;
     if (typeof window !== "undefined") {
-      if (window.location.hash.startsWith("#/app")) return "app";
+      if (window.location.hash.startsWith("#/app")) {
+        // Protected route guard: if user is not authenticated, redirect to landing
+        if (!getAuthToken()) {
+          window.location.hash = "#/";
+          return "landing";
+        }
+        return "app";
+      }
       if (window.location.hash === "#/landing" || window.location.hash === "#/") return "landing";
     }
-    const isTestEnv =
-      (typeof import.meta !== "undefined" && (import.meta as any).env?.MODE === "test") ||
-      (typeof globalThis !== "undefined" && (globalThis as any).process?.env?.NODE_ENV === "test");
 
-    if (isTestEnv) {
-      return "app";
-    }
     return "landing";
   });
 
@@ -66,15 +67,45 @@ export const App: React.FC<AppProps> = ({ initialView, initialTab = "dashboard" 
   const [activeQueryPrompt, setActiveQueryPrompt] = useState<string>("");
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isExploringSample, setIsExploringSample] = useState<boolean>(false);
+  const requestSeqRef = React.useRef<number>(0);
 
   const activeOrgId = currentUser?.active_organization?.id || null;
   const userRole: UserRole = currentUser?.active_organization?.role || (currentUser?.is_staff ? "ADMIN" : "VIEWER");
 
+  const handleSignOut = () => {
+    // 1. Invalidate any in-flight async request callbacks
+    requestSeqRef.current += 1;
+
+    // 2. Clear tokens and org keys from browser storage
+    api.logout();
+
+    // 3. Clear authenticated user & roles
+    setCurrentUser(null);
+
+    // 4. Clear private dashboard & application state from memory
+    setDashboardData(null);
+    setDashboardError(null);
+    setActiveQueryPrompt("");
+    setIsExploringSample(false);
+    setIsAuthModalOpen(false);
+
+    // 5. Reset active tab to default
+    setActiveTab("dashboard");
+
+    // 6. Force immediate redirection to public landing page
+    setViewMode("landing");
+    if (typeof window !== "undefined") {
+      window.location.hash = "#/";
+    }
+  };
+
   const handleSelectOrganization = (orgId: number) => {
     setActiveOrgId(orgId);
+    setIsExploringSample(false);
     api.getCurrentUser().then((u) => {
       setCurrentUser(u);
-      refreshDashboard();
+      refreshDashboard(false);
     });
   };
 
@@ -85,20 +116,27 @@ export const App: React.FC<AppProps> = ({ initialView, initialTab = "dashboard" 
       .catch((err) => console.error("Failed to fetch AI status:", err));
   };
 
-  const refreshDashboard = () => {
+  const refreshDashboard = (sampleMode: boolean = isExploringSample) => {
+    const thisSeq = ++requestSeqRef.current;
     setLoadingDashboard(true);
     setDashboardError(null);
     api
-      .getDashboardData()
+      .getDashboardData({ sample: sampleMode })
       .then((data) => {
+        if (thisSeq !== requestSeqRef.current) return;
         setDashboardData(data);
         setDashboardError(null);
       })
       .catch((err) => {
+        if (thisSeq !== requestSeqRef.current) return;
         console.error("Failed to fetch dashboard data:", err);
         setDashboardError(err.message || "Failed to load dashboard metrics.");
       })
-      .finally(() => setLoadingDashboard(false));
+      .finally(() => {
+        if (thisSeq === requestSeqRef.current) {
+          setLoadingDashboard(false);
+        }
+      });
   };
 
   useEffect(() => {
@@ -109,14 +147,21 @@ export const App: React.FC<AppProps> = ({ initialView, initialTab = "dashboard" 
         .getCurrentUser()
         .then(setCurrentUser)
         .catch(() => {
-          api.logout();
-          setCurrentUser(null);
+          handleSignOut();
         });
     }
 
     const onHashChange = () => {
       const hash = window.location.hash;
       if (hash.startsWith("#/app")) {
+        // Protected route guard: if user is not authenticated, redirect to landing
+        if (!getAuthToken()) {
+          setViewMode("landing");
+          if (window.location.hash !== "#/") {
+            window.location.hash = "#/";
+          }
+          return;
+        }
         setViewMode("app");
         const tab = getTabFromHash();
         if (tab) {
@@ -131,8 +176,26 @@ export const App: React.FC<AppProps> = ({ initialView, initialTab = "dashboard" 
       }
     };
 
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "aidb_access_token" && !e.newValue) {
+        // Cross-tab logout: another browser tab signed out
+        handleSignOut();
+      }
+    };
+
+    const handleUnauthorized = () => {
+      handleSignOut();
+    };
+
     window.addEventListener("hashchange", onHashChange);
-    return () => window.removeEventListener("hashchange", onHashChange);
+    window.addEventListener("storage", handleStorageChange);
+    window.addEventListener("metriva:unauthorized", handleUnauthorized);
+
+    return () => {
+      window.removeEventListener("hashchange", onHashChange);
+      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("metriva:unauthorized", handleUnauthorized);
+    };
   }, []);
 
   const handleSelectTab = (tab: NavTab) => {
@@ -176,6 +239,7 @@ export const App: React.FC<AppProps> = ({ initialView, initialTab = "dashboard" 
         <LandingPage
           onLaunchApp={handleLaunchApp}
           onOpenAuth={() => setIsAuthModalOpen(true)}
+          onLogout={handleSignOut}
           currentUser={currentUser}
           onNavigateToQueryWithPrompt={handleNavigateToQueryWithPrompt}
         />
@@ -186,10 +250,7 @@ export const App: React.FC<AppProps> = ({ initialView, initialTab = "dashboard" 
             onOpenQuery={() => handleNavigateToQuery()}
             currentUser={currentUser}
             onOpenAuth={() => setIsAuthModalOpen(true)}
-            onLogout={() => {
-              api.logout();
-              setCurrentUser(null);
-            }}
+            onLogout={handleSignOut}
             onNavigateToLanding={handleNavigateToLanding}
             onSelectOrganization={handleSelectOrganization}
           />
@@ -266,8 +327,18 @@ export const App: React.FC<AppProps> = ({ initialView, initialTab = "dashboard" 
                   data={dashboardData}
                   loading={loadingDashboard}
                   error={dashboardError}
-                  onRetry={refreshDashboard}
+                  onRetry={() => refreshDashboard(isExploringSample)}
                   onNavigateToQuery={handleNavigateToQuery}
+                  onNavigateToDataSources={() => handleSelectTab("datasources")}
+                  onExploreSample={() => {
+                    setIsExploringSample(true);
+                    refreshDashboard(true);
+                  }}
+                  onExitSample={() => {
+                    setIsExploringSample(false);
+                    refreshDashboard(false);
+                  }}
+                  isExploringSample={isExploringSample}
                 />
               )}
 
@@ -283,17 +354,34 @@ export const App: React.FC<AppProps> = ({ initialView, initialTab = "dashboard" 
 
               {activeTab === "reports" && <ReportsView />}
 
-              {activeTab === "comparisons" && <PeriodComparisonView />}
+              {activeTab === "comparisons" && (
+                <PeriodComparisonView
+                  key={activeOrgId || "none"}
+                  onNavigateToDataSources={() => handleSelectTab("datasources")}
+                />
+              )}
 
-              {activeTab === "ml" && <MLDashboardView />}
+              {activeTab === "ml" && (
+                <MLDashboardView
+                  key={activeOrgId || "none"}
+                  onNavigateToDataSources={() => handleSelectTab("datasources")}
+                />
+              )}
 
               {activeTab === "history" && (
                 <HistoryView onSelectQueryForReRun={handleNavigateToQuery} />
               )}
 
-              {activeTab === "schema" && <SchemaExplorerView />}
+              {activeTab === "schema" && (
+                <SchemaExplorerView onNavigateToDataSources={() => handleSelectTab("datasources")} />
+              )}
 
-              {activeTab === "analytics" && <DeepAnalyticsView />}
+              {activeTab === "analytics" && (
+                <DeepAnalyticsView
+                  key={activeOrgId || "none"}
+                  onNavigateToDataSources={() => handleSelectTab("datasources")}
+                />
+              )}
 
               {activeTab === "settings" && (
                 <SettingsView
@@ -315,6 +403,13 @@ export const App: React.FC<AppProps> = ({ initialView, initialTab = "dashboard" 
           setCurrentUser(user);
           if (user?.active_organization?.id) {
             setActiveOrgId(user.active_organization.id);
+          } else {
+            setActiveOrgId(null);
+          }
+          setViewMode("app");
+          setActiveTab("dashboard");
+          if (typeof window !== "undefined") {
+            window.location.hash = "#/app/dashboard";
           }
           refreshDashboard();
         }}

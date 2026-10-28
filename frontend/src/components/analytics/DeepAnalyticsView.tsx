@@ -1,32 +1,191 @@
 import React, { useEffect, useState } from "react";
-import { DollarSign, Layers, LineChart, Package, Users } from "lucide-react";
+import {
+  Database,
+  DollarSign,
+  Eye,
+  Layers,
+  LineChart,
+  Package,
+  Plus,
+  RefreshCw,
+  Sparkles,
+  Users,
+  X,
+} from "lucide-react";
 import { api } from "../../services/api";
+import { MetrivaCard, MetrivaBadge, MetrivaButton } from "../../design-system";
 
-export const DeepAnalyticsView: React.FC = () => {
+interface DeepAnalyticsViewProps {
+  onNavigateToDataSources?: () => void;
+}
+
+export const DeepAnalyticsView: React.FC<DeepAnalyticsViewProps> = ({
+  onNavigateToDataSources,
+}) => {
   const [activeTab, setActiveTab] = useState<"revenue" | "customers" | "products">("revenue");
   const [revenueData, setRevenueData] = useState<any[]>([]);
   const [customerData, setCustomerData] = useState<any[]>([]);
   const [productData, setProductData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSampleMode, setIsSampleMode] = useState<boolean>(false);
+
+  const fetchData = async (sample: boolean = isSampleMode) => {
+    setLoading(true);
+    try {
+      const [rev, cust, prod] = await Promise.all([
+        api.getRevenueAnalytics({ sample }),
+        api.getCustomerSegments({ sample }),
+        api.getProductPerformance({ sample }),
+      ]);
+      setRevenueData(rev || []);
+      setCustomerData(cust || []);
+      setProductData(prod || []);
+    } catch (err) {
+      console.error("Error loading deep analytics:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    setLoading(true);
-    Promise.all([
-      api.getRevenueAnalytics(),
-      api.getCustomerSegments(),
-      api.getProductPerformance(),
-    ])
-      .then(([rev, cust, prod]) => {
-        setRevenueData(rev);
-        setCustomerData(cust);
-        setProductData(prod);
-      })
-      .catch((err) => console.error("Error loading deep analytics:", err))
-      .finally(() => setLoading(false));
+    fetchData();
   }, []);
+
+  const isEmpty =
+    !isSampleMode &&
+    revenueData.length === 0 &&
+    customerData.length === 0 &&
+    productData.length === 0;
+
+  if (!loading && isEmpty) {
+    return (
+      <div className="space-y-6 pb-16 max-w-4xl mx-auto my-6">
+        <MetrivaCard variant="glass" className="p-8 sm:p-10 text-center relative overflow-hidden shadow-xl border-dashed">
+          <div className="mx-auto w-16 h-16 rounded-2xl bg-gradient-to-tr from-cyan-500/20 to-blue-500/20 border border-cyan-500/30 flex items-center justify-center text-cyan-600 dark:text-cyan-400 mb-5 shadow-lg shadow-cyan-500/10">
+            <LineChart className="h-8 w-8" />
+          </div>
+
+          <MetrivaBadge variant="cyan" size="sm" className="mb-3">
+            Multi-Dimensional SQL
+          </MetrivaBadge>
+
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+            Connect Your Database for Deep Business Analytics
+          </h2>
+
+          <p className="text-sm text-slate-600 dark:text-slate-400 max-w-xl mx-auto mt-2 leading-relaxed">
+            Deep Business Analytics computes multi-dimensional SQL aggregations across monthly revenue trends, customer lifetime value segments, and product catalog metrics. Connect your database to start analyzing, or explore sample demonstration analytics.
+          </p>
+
+          <div className="flex flex-wrap items-center justify-center gap-3.5 mt-7">
+            {onNavigateToDataSources && (
+              <MetrivaButton
+                onClick={onNavigateToDataSources}
+                size="md"
+                variant="primary"
+                icon={<Database className="h-4 w-4" />}
+                className="shadow-lg shadow-cyan-500/25"
+              >
+                Connect Database
+              </MetrivaButton>
+            )}
+            <MetrivaButton
+              onClick={() => {
+                setIsSampleMode(true);
+                fetchData(true);
+              }}
+              size="md"
+              variant="secondary"
+              icon={<Eye className="h-4 w-4" />}
+            >
+              Explore Sample Analytics
+            </MetrivaButton>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-10 pt-8 border-t border-slate-200 dark:border-slate-800/80 text-left">
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800/60">
+              <div className="flex items-center gap-2 font-semibold text-xs text-slate-900 dark:text-white mb-1.5">
+                <DollarSign className="h-4 w-4 text-cyan-500" />
+                <span>Monthly Revenue Breakdown</span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Detailed order volume tracking, settlement totals, and average order value across fiscal months.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800/60">
+              <div className="flex items-center gap-2 font-semibold text-xs text-slate-900 dark:text-white mb-1.5">
+                <Users className="h-4 w-4 text-emerald-500" />
+                <span>Customer Cohort Tiers</span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                LTV segmentation across Enterprise, SMB, and Consumer tiers with average orders per account.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800/60">
+              <div className="flex items-center gap-2 font-semibold text-xs text-slate-900 dark:text-white mb-1.5">
+                <Package className="h-4 w-4 text-purple-500" />
+                <span>Product Performance</span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Inventory turnover, stock levels, unit volume, and category revenue realization.
+              </p>
+            </div>
+          </div>
+        </MetrivaCard>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 pb-16">
+      {/* Sample Exploration Mode Banner */}
+      {isSampleMode && (
+        <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-cyan-500/10 border border-amber-500/30 dark:border-amber-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 shrink-0">
+              <Eye className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300">
+                  Sample Deep Analytics Active
+                </span>
+                <MetrivaBadge variant="amber" size="sm">Demo Mode</MetrivaBadge>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                Viewing synthetic e-commerce aggregates (monthly revenue, customer tiers, product metrics). Connect an external database to analyze your workspace&apos;s actual data.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+            {onNavigateToDataSources && (
+              <MetrivaButton
+                onClick={onNavigateToDataSources}
+                size="sm"
+                variant="primary"
+                icon={<Database className="h-3.5 w-3.5" />}
+              >
+                Connect Database
+              </MetrivaButton>
+            )}
+            <MetrivaButton
+              onClick={() => {
+                setIsSampleMode(false);
+                fetchData(false);
+              }}
+              size="sm"
+              variant="secondary"
+              icon={<X className="h-3.5 w-3.5" />}
+            >
+              Exit Sample Mode
+            </MetrivaButton>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>

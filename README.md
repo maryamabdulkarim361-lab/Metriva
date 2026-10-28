@@ -113,6 +113,7 @@ flowchart TB
   - `ANALYST`: Natural language query generation, Direct SQL execution, saved report authoring, and asynchronous ML job execution. Query results are dynamically masked according to organizational policies.
   - `VIEWER`: Restricted strictly to pre-approved executive dashboards, saved reports, and certified analytics. Viewers cannot execute arbitrary SQL or AI queries, nor trigger unmonitored model runs.
 - **Server-Side Tenant Clamping**: All database queries, query histories, saved reports, database credentials, and ML runs are scoped to the authenticated user's active organization. Cross-organization access is strictly rejected at the ORM layer.
+- **New-User Onboarding & Demo Isolation**: Newly registered organizations without connected external databases enter a clean onboarding state with zero datasources and zero query history leaks. Shared synthetic benchmark metrics are displayed strictly in an explicit, clearly labeled sample mode.
 - **Immediate Role Revocation**: Revoking membership or downgrading roles invalidates access tokens and session context immediately without stale permission caching.
 
 ### 🛡️ Dynamic Column-Level Data Masking & AST Inference Mitigation
@@ -171,17 +172,17 @@ The codebase has undergone exhaustive automated testing across unit, integration
 
 | Test Suite | Framework | Target / Focus | Unique Tests | Status |
 | :--- | :--- | :--- | :---: | :---: |
-| **Backend Test Suite (Total)** | Pytest 9.1 | Comprehensive API, ORM, RBAC, AST, ML, and Datasource suites | **184 / 184** | ✅ PASS |
-| ↳ *RBAC & Data Protection* | Pytest 9.1 | Multi-tenant isolation, role hierarchy, dynamic masking | *23 / 23* | ✅ PASS |
+| **Backend Test Suite (Total)** | Pytest 9.1 | Comprehensive API, ORM, RBAC, AST, ML, and Datasource suites | **187 / 187** | ✅ PASS |
+| ↳ *RBAC & Data Protection* | Pytest 9.1 | Multi-tenant isolation, role hierarchy, dynamic masking | *26 / 26* | ✅ PASS |
 | ↳ *Security Hardening Suite* | Pytest 9.1 | SSRF, Path Traversal, AST Splitting, Wildcard & Permission Guards | *16 / 16* | ✅ PASS |
 | ↳ *MySQL 8.4 Live Integration* | Pytest 9.1 | Genuine MySQL 8.4 Server, Schema Introspection, Read-Only User | *12 / 12* | ✅ PASS |
 | ↳ *SQL AST Validator Suite* | Pytest 9.1 | Lexical token parsing, syntax sanitizing, DDL/DML blocking | *55 / 55* | ✅ PASS |
-| **Frontend Test Suite (Total)** | Vitest 2.1 | Components, Navigation, Query Studio, RBAC Guards, Masking UI | **47 / 47** | ✅ PASS |
+| **Frontend Test Suite (Total)** | Vitest 2.1 | Components, Navigation, Query Studio, RBAC Guards, Onboarding & Session Isolation | **54 / 54** | ✅ PASS |
 | **Python Linter** | Ruff | PEP 8, Import hygiene, Static analysis | **Clean (0 errors)** | ✅ PASS |
 | **TypeScript / Frontend Build** | TypeScript / Vite | Strict typechecking (`tsc`) and production bundle compilation | **Clean (0 errors)** | ✅ PASS |
 | **CI Workflow Pipeline** | GitHub Actions | Automated Ubuntu test runner with PostgreSQL & MySQL services | **100% Passing** | ✅ PASS |
 
-**Unique Automated Tests:** **231 unique automated tests** (184 backend and 47 frontend), all passing (100%), with dedicated coverage for live MySQL 8.4 integration (12 tests) and security hardening (16 checks).
+**Unique Automated Tests:** **241 unique automated tests** (187 backend and 54 frontend), all passing (100%), with dedicated coverage for live MySQL 8.4 integration (12 tests) and security hardening (16 checks).
 
 ---
 

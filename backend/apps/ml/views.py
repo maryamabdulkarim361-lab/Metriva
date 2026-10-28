@@ -141,6 +141,37 @@ class MLAnomalyAlertViewSet(viewsets.ModelViewSet):
         )
 
 
+def check_ml_tenant_access(request):
+    """
+    Determines whether the requesting user's active organization has connected datasources,
+    explicitly requested sample demo ML, or is the dedicated Metriva Demo Org.
+    Returns (is_empty_tenant, is_sample_view, has_connected_datasources, is_demo_org, org).
+    """
+    from apps.datasources.models import DataSource
+    from apps.organizations.service import resolve_tenant_context
+
+    org, role = resolve_tenant_context(request)
+    is_sample_requested = request.query_params.get("sample", "").lower() == "true"
+    if request.method == "POST":
+        is_sample_requested = is_sample_requested or str(request.data.get("sample", "")).lower() == "true"
+    is_demo_org = bool(org and org.slug == "metriva-demo-org")
+
+    has_connected_datasources = False
+    if org:
+        has_connected_datasources = DataSource.objects.filter(
+            organization=org, is_active=True
+        ).exists()
+
+    is_sample_view = is_sample_requested or is_demo_org or not has_connected_datasources
+    is_empty_tenant = (
+        request.user.is_authenticated
+        and not has_connected_datasources
+        and not is_sample_requested
+        and not is_demo_org
+    )
+    return is_empty_tenant, is_sample_view, has_connected_datasources, is_demo_org, org
+
+
 class MLJobViewSet(viewsets.ReadOnlyModelViewSet):
     """Background ML training, backtesting, and batch execution job tracking."""
 
@@ -149,13 +180,11 @@ class MLJobViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [permissions.AllowAny]
 
     def get_queryset(self):
-        from django.db import models
-
         qs = super().get_queryset()
         user = self.request.user
         if user.is_authenticated:
             if not user.is_staff:
-                qs = qs.filter(models.Q(user=user) | models.Q(user__isnull=True))
+                qs = qs.filter(user=user)
         else:
             qs = qs.filter(user__isnull=True)
         return qs
@@ -199,20 +228,90 @@ class RevenueForecastAPIView(APIView):
         agg = request.query_params.get("aggregation", "monthly").lower()
         horizon = int(request.query_params.get("horizon", 3))
 
+        (
+            is_empty_tenant,
+            is_sample_view,
+            has_connected_datasources,
+            is_demo_org,
+            org,
+        ) = check_ml_tenant_access(request)
+
+        if is_empty_tenant:
+            return api_response(
+                data={
+                    "success": True,
+                    "has_connected_datasources": False,
+                    "is_sample_view": False,
+                    "model_name": "Holt-Winters Linear Trend Time-Series Forecaster",
+                    "model_version": "1.0.0",
+                    "aggregation": agg,
+                    "historical_periods_used": 0,
+                    "historical_data": [],
+                    "forecast_horizon": horizon,
+                    "forecast_data": [],
+                    "evaluation_metrics": None,
+                    "baseline_comparison": None,
+                    "model_parameters": {},
+                    "message": "No authorized business dataset connected to this workspace. Connect an external database or explore sample demo forecasts.",
+                }
+            )
+
         res = train_and_forecast_revenue(aggregation=agg, forecast_horizon=horizon)
         if not res.get("success"):
             return api_error(message=res.get("error", "Forecasting failed."), code="FORECAST_ERROR")
 
+        res["has_connected_datasources"] = has_connected_datasources or not request.user.is_authenticated
+        res["is_sample_view"] = is_sample_view
+        res["is_synthetic_demo"] = True
+        res["sample_disclaimer"] = (
+            "Synthetic demonstration forecast derived from seeded PostgreSQL e-commerce dataset. "
+            "Built-in time-series ML models evaluate against standard 3NF e-commerce schema."
+        )
         return api_response(data=res)
 
     def post(self, request):
         agg = request.data.get("aggregation", "monthly").lower()
         horizon = int(request.data.get("horizon", 3))
 
+        (
+            is_empty_tenant,
+            is_sample_view,
+            has_connected_datasources,
+            is_demo_org,
+            org,
+        ) = check_ml_tenant_access(request)
+
+        if is_empty_tenant:
+            return api_response(
+                data={
+                    "success": True,
+                    "has_connected_datasources": False,
+                    "is_sample_view": False,
+                    "model_name": "Holt-Winters Linear Trend Time-Series Forecaster",
+                    "model_version": "1.0.0",
+                    "aggregation": agg,
+                    "historical_periods_used": 0,
+                    "historical_data": [],
+                    "forecast_horizon": horizon,
+                    "forecast_data": [],
+                    "evaluation_metrics": None,
+                    "baseline_comparison": None,
+                    "model_parameters": {},
+                    "message": "No authorized business dataset connected to this workspace. Connect an external database or explore sample demo forecasts.",
+                }
+            )
+
         res = train_and_forecast_revenue(aggregation=agg, forecast_horizon=horizon)
         if not res.get("success"):
             return api_error(message=res.get("error", "Forecasting failed."), code="FORECAST_ERROR")
 
+        res["has_connected_datasources"] = has_connected_datasources or not request.user.is_authenticated
+        res["is_sample_view"] = is_sample_view
+        res["is_synthetic_demo"] = True
+        res["sample_disclaimer"] = (
+            "Synthetic demonstration forecast derived from seeded PostgreSQL e-commerce dataset. "
+            "Built-in time-series ML models evaluate against standard 3NF e-commerce schema."
+        )
         return api_response(data=res)
 
 
@@ -223,18 +322,88 @@ class CustomerChurnAPIView(APIView):
 
     def get(self, request):
         inactivity_days = int(request.query_params.get("inactivity_days", 60))
+
+        (
+            is_empty_tenant,
+            is_sample_view,
+            has_connected_datasources,
+            is_demo_org,
+            org,
+        ) = check_ml_tenant_access(request)
+
+        if is_empty_tenant:
+            return api_response(
+                data={
+                    "success": True,
+                    "has_connected_datasources": False,
+                    "is_sample_view": False,
+                    "model_name": "Logistic Classification Churn Predictor",
+                    "model_version": "1.0.0",
+                    "inactivity_definition_days": inactivity_days,
+                    "total_cohort_customers": 0,
+                    "churn_rate_pct": 0.0,
+                    "evaluation_metrics": None,
+                    "baseline_comparison": None,
+                    "top_at_risk_customers": [],
+                    "risk_distribution": {"high_risk_count": 0, "medium_risk_count": 0, "low_risk_count": 0},
+                    "feature_importance": {},
+                    "message": "No authorized business dataset connected to this workspace. Connect an external database or explore sample churn risk scoring.",
+                }
+            )
+
         res = train_and_evaluate_churn_model(inactivity_days=inactivity_days)
         if not res.get("success"):
             return api_error(message=res.get("error", "Churn analysis failed."), code="CHURN_ERROR")
 
+        res["has_connected_datasources"] = has_connected_datasources or not request.user.is_authenticated
+        res["is_sample_view"] = is_sample_view
+        res["is_synthetic_demo"] = True
+        res["sample_disclaimer"] = (
+            "Synthetic demonstration churn model trained on seeded PostgreSQL e-commerce customer cohort."
+        )
         return api_response(data=res)
 
     def post(self, request):
         inactivity_days = int(request.data.get("inactivity_days", 60))
+
+        (
+            is_empty_tenant,
+            is_sample_view,
+            has_connected_datasources,
+            is_demo_org,
+            org,
+        ) = check_ml_tenant_access(request)
+
+        if is_empty_tenant:
+            return api_response(
+                data={
+                    "success": True,
+                    "has_connected_datasources": False,
+                    "is_sample_view": False,
+                    "model_name": "Logistic Classification Churn Predictor",
+                    "model_version": "1.0.0",
+                    "inactivity_definition_days": inactivity_days,
+                    "total_cohort_customers": 0,
+                    "churn_rate_pct": 0.0,
+                    "evaluation_metrics": None,
+                    "baseline_comparison": None,
+                    "top_at_risk_customers": [],
+                    "risk_distribution": {"high_risk_count": 0, "medium_risk_count": 0, "low_risk_count": 0},
+                    "feature_importance": {},
+                    "message": "No authorized business dataset connected to this workspace. Connect an external database or explore sample churn risk scoring.",
+                }
+            )
+
         res = train_and_evaluate_churn_model(inactivity_days=inactivity_days)
         if not res.get("success"):
             return api_error(message=res.get("error", "Churn analysis failed."), code="CHURN_ERROR")
 
+        res["has_connected_datasources"] = has_connected_datasources or not request.user.is_authenticated
+        res["is_sample_view"] = is_sample_view
+        res["is_synthetic_demo"] = True
+        res["sample_disclaimer"] = (
+            "Synthetic demonstration churn model trained on seeded PostgreSQL e-commerce customer cohort."
+        )
         return api_response(data=res)
 
 
@@ -245,18 +414,78 @@ class AnomalyScanAPIView(APIView):
 
     def get(self, request):
         z_thresh = float(request.query_params.get("z_threshold", 2.2))
+
+        (
+            is_empty_tenant,
+            is_sample_view,
+            has_connected_datasources,
+            is_demo_org,
+            org,
+        ) = check_ml_tenant_access(request)
+
+        if is_empty_tenant:
+            from django.utils import timezone
+
+            return api_response(
+                data={
+                    "success": True,
+                    "has_connected_datasources": False,
+                    "is_sample_view": False,
+                    "scan_timestamp": timezone.now().isoformat(),
+                    "z_threshold": z_thresh,
+                    "scanned_days": 0,
+                    "total_anomalies_detected": 0,
+                    "metric_baselines": {},
+                    "anomalies": [],
+                    "summary": "No authorized business dataset connected to this workspace. Connect an external database or explore sample anomaly scans.",
+                }
+            )
+
         res = run_anomaly_detection_scan(z_threshold=z_thresh, persist_alerts=True)
         if not res.get("success"):
             return api_error(message=res.get("error", "Anomaly scan failed."), code="SCAN_ERROR")
 
+        res["has_connected_datasources"] = has_connected_datasources or not request.user.is_authenticated
+        res["is_sample_view"] = is_sample_view
+        res["is_synthetic_demo"] = True
         return api_response(data=res)
 
     def post(self, request):
         z_thresh = float(request.data.get("z_threshold", 2.2))
+
+        (
+            is_empty_tenant,
+            is_sample_view,
+            has_connected_datasources,
+            is_demo_org,
+            org,
+        ) = check_ml_tenant_access(request)
+
+        if is_empty_tenant:
+            from django.utils import timezone
+
+            return api_response(
+                data={
+                    "success": True,
+                    "has_connected_datasources": False,
+                    "is_sample_view": False,
+                    "scan_timestamp": timezone.now().isoformat(),
+                    "z_threshold": z_thresh,
+                    "scanned_days": 0,
+                    "total_anomalies_detected": 0,
+                    "metric_baselines": {},
+                    "anomalies": [],
+                    "summary": "No authorized business dataset connected to this workspace. Connect an external database or explore sample anomaly scans.",
+                }
+            )
+
         res = run_anomaly_detection_scan(z_threshold=z_thresh, persist_alerts=True)
         if not res.get("success"):
             return api_error(message=res.get("error", "Anomaly scan failed."), code="SCAN_ERROR")
 
+        res["has_connected_datasources"] = has_connected_datasources or not request.user.is_authenticated
+        res["is_sample_view"] = is_sample_view
+        res["is_synthetic_demo"] = True
         return api_response(data=res)
 
 
@@ -267,7 +496,37 @@ class MLInsightsAPIView(APIView):
 
     def get(self, request):
         topic = request.query_params.get("topic", "comprehensive")
+
+        (
+            is_empty_tenant,
+            is_sample_view,
+            has_connected_datasources,
+            is_demo_org,
+            org,
+        ) = check_ml_tenant_access(request)
+
+        if is_empty_tenant:
+            return api_response(
+                data={
+                    "success": True,
+                    "has_connected_datasources": False,
+                    "is_sample_view": False,
+                    "topic": topic,
+                    "executive_summary": {
+                        "observed_historical_facts": [],
+                        "predictive_estimates": [],
+                        "statistical_associations": [],
+                        "investigation_hypotheses": [],
+                    },
+                    "raw_model_telemetry": {},
+                    "message": "No authorized business dataset connected to this workspace. Connect an external database or explore sample ML insights.",
+                }
+            )
+
         res = generate_ml_business_insights(topic=topic)
+        res["has_connected_datasources"] = has_connected_datasources or not request.user.is_authenticated
+        res["is_sample_view"] = is_sample_view
+        res["is_synthetic_demo"] = True
         return api_response(data=res)
 
 
@@ -278,6 +537,7 @@ class TriggerMLJobAPIView(APIView):
 
     def post(self, request):
         if request.user and request.user.is_authenticated:
+            from apps.datasources.models import DataSource
             from apps.organizations.models import RoleChoices
             from apps.organizations.service import resolve_tenant_context
 
@@ -287,6 +547,24 @@ class TriggerMLJobAPIView(APIView):
                     message="Viewers do not have permission to trigger background machine learning jobs.",
                     code="FORBIDDEN",
                     status_code=status.HTTP_403_FORBIDDEN,
+                )
+
+            is_demo_org = bool(org and org.slug == "metriva-demo-org")
+            has_connected_datasources = False
+            if org:
+                has_connected_datasources = DataSource.objects.filter(
+                    organization=org, is_active=True
+                ).exists()
+
+            if not has_connected_datasources and not is_demo_org and not request.user.is_staff:
+                return api_error(
+                    message=(
+                        "Cannot trigger background machine learning job: no authorized external "
+                        "business dataset is connected to this workspace. Connect an external "
+                        "database before initiating model training."
+                    ),
+                    code="NO_CONNECTED_DATASET",
+                    status_code=status.HTTP_400_BAD_REQUEST,
                 )
 
         job_type = request.data.get("job_type", "TRAIN_FORECAST")

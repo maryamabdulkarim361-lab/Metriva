@@ -89,6 +89,19 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         <TeamAccessView activeOrgId={activeOrgId} userRole={userRole} />
       ) : (
         <>
+          {/* Global Configuration Scope Notice */}
+          <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 flex items-start gap-3 text-xs">
+            <Server className="h-4 w-4 text-cyan-600 dark:text-cyan-400 mt-0.5 shrink-0" />
+            <div className="space-y-0.5">
+              <span className="font-semibold text-slate-800 dark:text-slate-200">
+                Global Platform Engine Configuration
+              </span>
+              <p className="text-slate-500 dark:text-slate-400 leading-relaxed">
+                The parameters below reflect the global Metriva application host environment (AI execution provider, execution timeouts, SQL safety boundaries, and connector drivers). External databases and team roles are managed per organization.
+              </p>
+            </div>
+          </div>
+
           {/* AI Provider Section */}
       <MetrivaCard variant="glass" className="p-6 shadow-xl space-y-4">
         <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800/80 pb-3">
@@ -105,14 +118,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 space-y-1.5">
             <span className="text-slate-500 font-medium">Active Provider</span>
             <div className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <span>{aiStatus?.demo_mode ? "Deterministic Mock Provider" : "OpenAI Compatible"}</span>
+              <span>{aiStatus?.demo_mode ? "Deterministic Mock Provider (Demo Mode)" : "OpenAI Remote LLM"}</span>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-100 dark:bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 border border-cyan-200 dark:border-cyan-500/20">
                 {aiStatus?.provider}
               </span>
             </div>
             <p className="text-slate-600 dark:text-slate-400 text-[11px] mt-1">
               {aiStatus?.demo_mode
-                ? "Zero-setup demo mode active. All example queries work deterministically without external API costs."
+                ? "Offline deterministic mock provider active for evaluation and testing. Generates safe SQL deterministically without external API calls or OpenAI usage costs."
                 : "Live API key detected. Queries will be generated dynamically using remote LLM."}
             </p>
           </div>
@@ -181,22 +194,21 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           <span>Database Architecture & Multi-Engine Connectors</span>
         </div>
 
-        <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 space-y-2 text-xs">
+        <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 space-y-2.5 text-xs">
           <div className="flex items-center justify-between">
             <span className="text-slate-500 dark:text-slate-400">Supported Connectors:</span>
             <span className="text-slate-800 dark:text-slate-200 font-mono">PostgreSQL (psycopg3), MySQL (pymysql), SQLite3</span>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-slate-500 dark:text-slate-400">ORM / Engine:</span>
-            <span className="text-slate-800 dark:text-slate-200 font-mono">Django 5.1 ORM + Native SQL Execution Engine</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-slate-500 dark:text-slate-400">Demo Database:</span>
-            <span className="text-emerald-600 dark:text-emerald-400 font-semibold">PostgreSQL (3NF Normalized Business Schema)</span>
+            <span className="text-slate-500 dark:text-slate-400">Backend Application Store:</span>
+            <span className="text-slate-800 dark:text-slate-200 font-mono">PostgreSQL (Metriva Core Metadata & Demo Schemas)</span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-slate-500 dark:text-slate-400">Credential Encryption:</span>
             <span className="text-cyan-600 dark:text-cyan-400 font-semibold font-mono">Fernet AES-128-CBC / HMAC-SHA256</span>
+          </div>
+          <div className="pt-2 border-t border-slate-200 dark:border-slate-800/80 text-[11px] text-slate-500 dark:text-slate-400">
+            <span className="font-semibold text-slate-700 dark:text-slate-300">Note:</span> The internal PostgreSQL store hosts Metriva application data and pre-seeded demonstration records. It is not an organization&apos;s connected database. External business databases are connected and managed per organization in the Database Connections tab.
           </div>
         </div>
       </MetrivaCard>

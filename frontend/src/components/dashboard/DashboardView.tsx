@@ -1,14 +1,19 @@
 import React from "react";
 import {
   AlertTriangle,
+  ArrowRight,
   Database,
   DollarSign,
+  Eye,
   Package,
+  Plus,
   RefreshCw,
+  ShieldCheck,
   ShoppingBag,
   Sparkles,
   TrendingUp,
   Users,
+  X,
 } from "lucide-react";
 import {
   Area,
@@ -34,6 +39,10 @@ interface DashboardViewProps {
   error?: string | null;
   onRetry?: () => void;
   onNavigateToQuery: (sampleQuestion?: string) => void;
+  onNavigateToDataSources?: () => void;
+  onExploreSample?: () => void;
+  onExitSample?: () => void;
+  isExploringSample?: boolean;
 }
 
 const METRIVA_CHART_COLORS = ["#06b6d4", "#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899"];
@@ -44,6 +53,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   error,
   onRetry,
   onNavigateToQuery,
+  onNavigateToDataSources,
+  onExploreSample,
+  onExitSample,
+  isExploringSample = false,
 }) => {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
@@ -94,8 +107,97 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     );
   }
 
+  // Onboarding Empty State for tenants with 0 connected datasources (when not exploring sample)
+  if (data.has_connected_datasources === false && !isExploringSample && !data.is_sample_view) {
+    return (
+      <div className="space-y-6 pb-12 max-w-5xl mx-auto">
+        <MetrivaCard variant="glass" className="p-8 sm:p-10 text-center relative overflow-hidden shadow-xl border-dashed">
+          <div className="mx-auto w-16 h-16 rounded-2xl bg-gradient-to-tr from-cyan-500/20 to-blue-500/20 border border-cyan-500/30 flex items-center justify-center text-cyan-600 dark:text-cyan-400 mb-5 shadow-lg shadow-cyan-500/10">
+            <Database className="h-8 w-8" />
+          </div>
+
+          <MetrivaBadge variant="cyan" size="sm" className="mb-3">
+            Workspace Onboarding
+          </MetrivaBadge>
+
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+            Connect Your Database to Unlock Analytics
+          </h2>
+
+          <p className="text-sm text-slate-600 dark:text-slate-400 max-w-2xl mx-auto mt-2 leading-relaxed">
+            Welcome to <span className="font-semibold text-slate-800 dark:text-slate-200">{data.organization_name || "your workspace"}</span>.
+            Metriva provides multi-engine SQL generation, automated schema discovery, and column-level RBAC data protection. Connect your database to start querying.
+          </p>
+
+          <div className="flex flex-wrap items-center justify-center gap-3.5 mt-7">
+            {onNavigateToDataSources && (
+              <MetrivaButton
+                onClick={onNavigateToDataSources}
+                size="md"
+                variant="primary"
+                icon={<Plus className="h-4 w-4" />}
+                className="shadow-lg shadow-cyan-500/25"
+              >
+                Connect Database
+              </MetrivaButton>
+            )}
+            {onExploreSample && (
+              <MetrivaButton
+                onClick={onExploreSample}
+                size="md"
+                variant="secondary"
+                icon={<Eye className="h-4 w-4" />}
+              >
+                Explore Sample Dashboard
+              </MetrivaButton>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-10 pt-8 border-t border-slate-200 dark:border-slate-800/80 text-left">
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800/60">
+              <div className="flex items-center gap-2 font-semibold text-xs text-slate-900 dark:text-white mb-1.5">
+                <Database className="h-4 w-4 text-cyan-500" />
+                <span>Multi-Engine Ready</span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Native drivers for PostgreSQL, MySQL 8.4+, and SQLite with connection pooling and SSL encryption.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800/60">
+              <div className="flex items-center gap-2 font-semibold text-xs text-slate-900 dark:text-white mb-1.5">
+                <ShieldCheck className="h-4 w-4 text-emerald-500" />
+                <span>Enterprise RBAC & Masking</span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Tenant isolation, read-only AST safety validators, and dynamic column-level PII data masking.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800/60">
+              <div className="flex items-center gap-2 font-semibold text-xs text-slate-900 dark:text-white mb-1.5">
+                <Sparkles className="h-4 w-4 text-purple-500" />
+                <span>AI Natural Language to SQL</span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Ask plain English questions, inspect generated SQL queries, and visualize results in real time.
+              </p>
+            </div>
+          </div>
+        </MetrivaCard>
+      </div>
+    );
+  }
+
+  const kpis = data.kpis || {
+    total_customers: 0,
+    total_orders: 0,
+    total_revenue: 0,
+    avg_order_value: 0,
+    completed_orders: 0,
+  };
+
   const {
-    kpis,
     revenue_by_month,
     revenue_by_country,
     order_status_distribution,
@@ -106,6 +208,51 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   return (
     <div className="space-y-6 pb-12 max-w-7xl mx-auto">
+      {/* Sample Exploration Mode Banner */}
+      {(isExploringSample || data.is_sample_view) && (
+        <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-cyan-500/10 border border-amber-500/30 dark:border-amber-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 shrink-0">
+              <Eye className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300">
+                  Sample Demonstration Mode Active
+                </span>
+                <MetrivaBadge variant="amber" size="sm">Demo Preview</MetrivaBadge>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                You are previewing a synthetic e-commerce demonstration dataset (250 customers, 2,500 orders). Connect an external database to display your workspace&apos;s actual metrics.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+            {onNavigateToDataSources && (
+              <MetrivaButton
+                onClick={onNavigateToDataSources}
+                size="sm"
+                variant="primary"
+                icon={<Plus className="h-3.5 w-3.5" />}
+              >
+                Connect Database
+              </MetrivaButton>
+            )}
+            {onExitSample && (
+              <MetrivaButton
+                onClick={onExitSample}
+                size="sm"
+                variant="secondary"
+                icon={<X className="h-3.5 w-3.5" />}
+              >
+                Exit Sample Mode
+              </MetrivaButton>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Top Welcome / Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-200 dark:border-slate-800/80">
         <div>

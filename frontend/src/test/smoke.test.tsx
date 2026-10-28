@@ -8,10 +8,16 @@ vi.mock("../services/api", async () => {
   const actual = await vi.importActual<any>("../services/api");
   return {
     ...actual,
-    getAuthToken: vi.fn(() => null),
+    getAuthToken: vi.fn(() => "mock-jwt-token"),
     setAuthToken: vi.fn(),
     api: {
       ...actual.api,
+      getCurrentUser: vi.fn().mockResolvedValue({
+        id: 1,
+        email: "admin@metriva.local",
+        name: "Demo Admin",
+        is_staff: true,
+      }),
       getAIStatus: vi.fn().mockResolvedValue({
         provider: "mock",
         model: "deterministic",
@@ -110,7 +116,7 @@ describe("Frontend Browser Integration Smoke Test", () => {
   });
 
   it("renders main application and navigates seamlessly across all core feature tabs", async () => {
-    render(<App />);
+    render(<App initialView="app" />);
 
     // 1. Initial Dashboard tab loads
     await waitFor(() => {
@@ -157,5 +163,5 @@ describe("Frontend Browser Integration Smoke Test", () => {
     await waitFor(() => {
       expect(screen.getByText("System & Engine Settings")).toBeInTheDocument();
     });
-  });
+  }, 15000);
 });

@@ -500,8 +500,141 @@ class SchemaExplorerView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def get(self, request):
+        from django.db import models
+
+        from apps.datasources.models import DataSource
+        from apps.datasources.schema_discovery import introspect_schema
+        from apps.organizations.service import resolve_tenant_context
+
+        org, role = resolve_tenant_context(request)
+        datasource_id = request.query_params.get("datasource_id")
+        is_sample_requested = request.query_params.get("sample", "").lower() == "true"
+        is_demo_org = bool(org and org.slug == "metriva-demo-org")
+
+        # 1. If explicit datasource_id provided, verify tenant authorization
+        if datasource_id:
+            try:
+                ds_id = int(datasource_id)
+            except (ValueError, TypeError):
+                return api_error(
+                    message="Invalid datasource ID.",
+                    code="INVALID_DATASOURCE_ID",
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                )
+
+            ds_qs = DataSource.objects.filter(id=ds_id, is_active=True)
+            if request.user.is_authenticated:
+                if org:
+                    ds_qs = ds_qs.filter(
+                        models.Q(organization=org)
+                        | models.Q(organization__isnull=True, user=request.user)
+                    )
+                elif not request.user.is_staff:
+                    ds_qs = ds_qs.filter(
+                        models.Q(user=request.user) | models.Q(user__isnull=True)
+                    )
+            else:
+                ds_qs = ds_qs.filter(user__isnull=True, organization__isnull=True)
+
+            datasource = ds_qs.first()
+            if not datasource:
+                return api_error(
+                    message=f"Data source with ID {ds_id} was not found or access is unauthorized.",
+                    code="DATA_SOURCE_NOT_FOUND",
+                    status_code=status.HTTP_404_NOT_FOUND,
+                )
+
+            schema = datasource.cached_schema or introspect_schema(datasource)
+            tables = schema.get("tables", [])
+            return api_response(
+                data={
+                    "has_connected_datasources": True,
+                    "is_sample_schema": False,
+                    "datasource_id": datasource.id,
+                    "datasource_name": datasource.name,
+                    "engine": datasource.engine,
+                    "database_name": datasource.database_name,
+                    "table_count": schema.get("table_count", len(tables)),
+                    "total_columns": schema.get(
+                        "total_columns", sum(len(t.get("columns", [])) for t in tables)
+                    ),
+                    "tables": tables,
+                    "er_diagram": schema.get("er_diagram", []),
+                    "relationships": schema.get("relationships", []),
+                    "allowed_tables": datasource.allowed_tables or [],
+                }
+            )
+
+        # 2. No datasource_id specified: check active organization's connected datasources
+        active_dss = []
+        if request.user.is_authenticated and org:
+            active_dss = list(
+                DataSource.objects.filter(organization=org, is_active=True)
+            )
+
+        if active_dss:
+            primary_ds = active_dss[0]
+            schema = primary_ds.cached_schema or introspect_schema(primary_ds)
+            tables = schema.get("tables", [])
+            return api_response(
+                data={
+                    "has_connected_datasources": True,
+                    "is_sample_schema": False,
+                    "datasource_id": primary_ds.id,
+                    "datasource_name": primary_ds.name,
+                    "engine": primary_ds.engine,
+                    "database_name": primary_ds.database_name,
+                    "table_count": schema.get("table_count", len(tables)),
+                    "total_columns": schema.get(
+                        "total_columns", sum(len(t.get("columns", [])) for t in tables)
+                    ),
+                    "tables": tables,
+                    "er_diagram": schema.get("er_diagram", []),
+                    "relationships": schema.get("relationships", []),
+                    "allowed_tables": primary_ds.allowed_tables or [],
+                }
+            )
+
+        # 3. Organization has 0 connected datasources and did not ask for sample schema:
+        if (
+            request.user.is_authenticated
+            and not is_sample_requested
+            and not is_demo_org
+        ):
+            return api_response(
+                data={
+                    "has_connected_datasources": False,
+                    "is_sample_schema": False,
+                    "datasource_id": None,
+                    "datasource_name": None,
+                    "engine": None,
+                    "database_name": "None",
+                    "table_count": 0,
+                    "total_columns": 0,
+                    "tables": [],
+                    "er_diagram": [],
+                    "relationships": [],
+                    "allowed_tables": [],
+                }
+            )
+
+        # 4. Fallback for sample demo schema or demo org or anonymous public demo
         metadata = get_schema_metadata()
-        return api_response(data=metadata)
+        return api_response(
+            data={
+                "has_connected_datasources": False,
+                "is_sample_schema": True,
+                "sample_description": "Synthetic Demo E-Commerce PostgreSQL Schema",
+                "table_count": metadata.get("table_count", len(metadata.get("tables", []))),
+                "total_columns": metadata.get("total_columns", 0),
+                "tables": metadata.get("tables", []),
+                "er_diagram": metadata.get("er_diagram", []),
+                "relationships": metadata.get("relationships", []),
+                "allowed_tables": metadata.get("allowed_tables", []),
+                "database_name": "metriva_demo",
+                "engine": "postgresql",
+            }
+        )
 
 
 class AIConfigStatusView(APIView):

@@ -58,7 +58,12 @@ export interface TopCustomer {
 }
 
 export interface DashboardData {
-  kpis: DashboardKPIs;
+  has_connected_datasources?: boolean;
+  is_sample_view?: boolean;
+  is_synthetic_demo?: boolean;
+  demo_dataset_description?: string;
+  organization_name?: string;
+  kpis?: DashboardKPIs | null;
   revenue_by_month: MonthlyRevenue[];
   revenue_by_country: CountryRevenue[];
   order_status_distribution: OrderStatusDistribution[];
@@ -119,9 +124,19 @@ export interface SchemaRelationship {
 }
 
 export interface SchemaMetadata {
+  has_connected_datasources?: boolean;
+  is_sample_schema?: boolean;
+  sample_description?: string;
+  datasource_id?: number | null;
+  datasource_name?: string | null;
+  engine?: string | null;
+  database_name?: string | null;
+  table_count?: number;
+  total_columns?: number;
   tables: SchemaTable[];
+  er_diagram?: any[];
   relationships: SchemaRelationship[];
-  allowed_tables: string[];
+  allowed_tables?: string[];
 }
 
 export interface AIStatus {
@@ -229,12 +244,17 @@ export interface PeriodComparisonSummary {
 }
 
 export interface PeriodComparisonResult {
+  has_connected_datasources?: boolean;
+  is_sample_view?: boolean;
+  is_synthetic_demo?: boolean;
+  organization_name?: string;
   period_type: string;
-  period_label: string;
+  period_label?: string;
   dimension?: string | null;
-  periods_analyzed: number;
+  periods_analyzed?: number;
   data: any[];
   summary: PeriodComparisonSummary;
+  message?: string;
 }
 
 export type ChartType = 'table' | 'kpi' | 'bar' | 'line' | 'pie' | 'scatter';
@@ -308,6 +328,10 @@ export interface MLForecastPoint {
 }
 
 export interface MLForecastResult {
+  has_connected_datasources?: boolean;
+  is_sample_view?: boolean;
+  is_synthetic_demo?: boolean;
+  sample_disclaimer?: string;
   success: boolean;
   model_name: string;
   model_version: string;
@@ -316,21 +340,22 @@ export interface MLForecastResult {
   historical_data: { date: string; revenue: number; orders: number }[];
   forecast_horizon: number;
   forecast_data: MLForecastPoint[];
-  evaluation_metrics: {
+  evaluation_metrics?: {
     mae: number;
     rmse: number;
     mape_pct?: number | null;
     test_split_periods: number;
-  };
-  baseline_comparison: {
+  } | null;
+  baseline_comparison?: {
     baseline_type: string;
     baseline_mae: number;
     baseline_rmse: number;
     baseline_mape_pct?: number | null;
     outperforms_baseline: boolean;
-  };
+  } | null;
   model_parameters: any;
   error?: string;
+  message?: string;
 }
 
 export interface MLChurnCustomer {
@@ -349,33 +374,38 @@ export interface MLChurnCustomer {
 }
 
 export interface MLChurnResult {
+  has_connected_datasources?: boolean;
+  is_sample_view?: boolean;
+  is_synthetic_demo?: boolean;
+  sample_disclaimer?: string;
   success: boolean;
   model_name: string;
   model_version: string;
   inactivity_definition_days: number;
   total_cohort_customers: number;
   churn_rate_pct: number;
-  evaluation_metrics: {
+  evaluation_metrics?: {
     accuracy: number;
     precision: number;
     recall: number;
     f1_score: number;
     test_split_size: number;
     confusion_matrix: { tp: number; fp: number; tn: number; fn: number };
-  };
-  baseline_comparison: {
+  } | null;
+  baseline_comparison?: {
     baseline_type: string;
     baseline_accuracy: number;
     model_accuracy: number;
-  };
-  feature_importance: Record<string, number>;
+  } | null;
+  feature_importance?: Record<string, number>;
   top_at_risk_customers: MLChurnCustomer[];
-  risk_distribution: {
+  risk_distribution?: {
     high_risk_count: number;
     medium_risk_count: number;
     low_risk_count: number;
   };
   error?: string;
+  message?: string;
 }
 
 export interface MLAnomalyItem {
@@ -390,13 +420,17 @@ export interface MLAnomalyItem {
 }
 
 export interface MLAnomalyScanResult {
+  has_connected_datasources?: boolean;
+  is_sample_view?: boolean;
+  is_synthetic_demo?: boolean;
   success: boolean;
-  scanned_days: number;
-  total_anomalies_detected: number;
-  z_threshold: number;
-  metric_baselines: Record<string, { mean: number; std: number; anomalies_count: number }>;
+  scanned_days?: number;
+  total_anomalies_detected?: number;
+  z_threshold?: number;
+  metric_baselines?: Record<string, { mean: number; std: number; anomalies_count: number }>;
   anomalies: MLAnomalyItem[];
   error?: string;
+  summary?: string;
 }
 
 export interface MLAnomalyAlert {
@@ -414,6 +448,9 @@ export interface MLAnomalyAlert {
 }
 
 export interface MLInsights {
+  has_connected_datasources?: boolean;
+  is_sample_view?: boolean;
+  is_synthetic_demo?: boolean;
   success: boolean;
   executive_summary: {
     observed_historical_facts: string[];
@@ -422,6 +459,7 @@ export interface MLInsights {
     investigation_hypotheses: string[];
   };
   raw_model_telemetry: any;
+  message?: string;
 }
 
 export interface MLModelVersion {

@@ -6,7 +6,9 @@ import {
   Calendar,
   CheckCircle2,
   ChevronDown,
+  Database,
   Download,
+  Eye,
   Filter,
   Lightbulb,
   Minus,
@@ -15,6 +17,7 @@ import {
   Table as TableIcon,
   TrendingDown,
   TrendingUp,
+  X,
 } from "lucide-react";
 import {
   Bar,
@@ -31,7 +34,13 @@ import { PeriodComparisonResult } from "../../types";
 import { MetrivaCard, MetrivaBadge, MetrivaButton, METRIVA_TOKENS } from "../../design-system";
 import { useTheme } from "../../theme/ThemeContext";
 
-export const PeriodComparisonView: React.FC = () => {
+interface PeriodComparisonViewProps {
+  onNavigateToDataSources?: () => void;
+}
+
+export const PeriodComparisonView: React.FC<PeriodComparisonViewProps> = ({
+  onNavigateToDataSources,
+}) => {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
 
@@ -42,8 +51,9 @@ export const PeriodComparisonView: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [comparisonData, setComparisonData] = useState<PeriodComparisonResult | null>(null);
   const [viewMode, setViewMode] = useState<"table" | "chart">("table");
+  const [isSampleMode, setIsSampleMode] = useState<boolean>(false);
 
-  const fetchData = async () => {
+  const fetchData = async (sample: boolean = isSampleMode) => {
     setLoading(true);
     setError(null);
     try {
@@ -51,6 +61,7 @@ export const PeriodComparisonView: React.FC = () => {
         period: periodType,
         dimension: dimension || undefined,
         limit,
+        sample,
       });
       setComparisonData(res);
     } catch (err: any) {
@@ -76,6 +87,7 @@ export const PeriodComparisonView: React.FC = () => {
 
   const exportCSV = () => {
     if (!comparisonData?.data?.length) return;
+    if (comparisonData.has_connected_datasources === false && !isSampleMode) return;
     const headers = Object.keys(comparisonData.data[0]);
     const csvContent = [
       headers.join(","),
@@ -97,8 +109,142 @@ export const PeriodComparisonView: React.FC = () => {
     document.body.removeChild(link);
   };
 
+  // Onboarding empty state when workspace has 0 connected datasources and not in sample mode
+  if (
+    !loading &&
+    comparisonData &&
+    comparisonData.has_connected_datasources === false &&
+    !isSampleMode
+  ) {
+    return (
+      <div className="space-y-6 pb-16 max-w-4xl mx-auto my-6">
+        <MetrivaCard variant="glass" className="p-8 sm:p-10 text-center relative overflow-hidden shadow-xl border-dashed">
+          <div className="mx-auto w-16 h-16 rounded-2xl bg-gradient-to-tr from-cyan-500/20 to-blue-500/20 border border-cyan-500/30 flex items-center justify-center text-cyan-600 dark:text-cyan-400 mb-5 shadow-lg shadow-cyan-500/10">
+            <TrendingUp className="h-8 w-8" />
+          </div>
+
+          <MetrivaBadge variant="cyan" size="sm" className="mb-3">
+            Time Series Analytics
+          </MetrivaBadge>
+
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+            Connect Your Database to Compare Business Performance
+          </h2>
+
+          <p className="text-sm text-slate-600 dark:text-slate-400 max-w-xl mx-auto mt-2 leading-relaxed">
+            Welcome to <span className="font-semibold text-slate-800 dark:text-slate-200">{comparisonData.organization_name || "your workspace"}</span>.
+            Period comparisons calculate deterministic trajectories (MoM, QoQ, YoY) using SQL window functions and generate evidence-grounded hypotheses from your transaction records.
+          </p>
+
+          <div className="flex flex-wrap items-center justify-center gap-3.5 mt-7">
+            {onNavigateToDataSources && (
+              <MetrivaButton
+                onClick={onNavigateToDataSources}
+                size="md"
+                variant="primary"
+                icon={<Database className="h-4 w-4" />}
+                className="shadow-lg shadow-cyan-500/25"
+              >
+                Connect Database
+              </MetrivaButton>
+            )}
+            <MetrivaButton
+              onClick={() => {
+                setIsSampleMode(true);
+                fetchData(true);
+              }}
+              size="md"
+              variant="secondary"
+              icon={<Eye className="h-4 w-4" />}
+            >
+              Explore Sample Comparisons
+            </MetrivaButton>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-10 pt-8 border-t border-slate-200 dark:border-slate-800/80 text-left">
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800/60">
+              <div className="flex items-center gap-2 font-semibold text-xs text-slate-900 dark:text-white mb-1.5">
+                <Calendar className="h-4 w-4 text-cyan-500" />
+                <span>Deterministic Windows</span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                MoM, QoQ, and YoY intervals with automated lag offsets and growth velocity metrics.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800/60">
+              <div className="flex items-center gap-2 font-semibold text-xs text-slate-900 dark:text-white mb-1.5">
+                <Filter className="h-4 w-4 text-emerald-500" />
+                <span>Multi-Dimensional Breakdown</span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Segment performance by customer cohorts, geographic regions, or product families.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800/60">
+              <div className="flex items-center gap-2 font-semibold text-xs text-slate-900 dark:text-white mb-1.5">
+                <Lightbulb className="h-4 w-4 text-purple-500" />
+                <span>Epistemic Synthesis</span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Strict separation of observed mathematical facts from exploratory business hypotheses.
+              </p>
+            </div>
+          </div>
+        </MetrivaCard>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 pb-16">
+      {/* Sample Exploration Mode Banner */}
+      {(isSampleMode || comparisonData?.is_sample_view) && (
+        <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-cyan-500/10 border border-amber-500/30 dark:border-amber-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 shrink-0">
+              <Eye className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300">
+                  Sample Comparisons Active
+                </span>
+                <MetrivaBadge variant="amber" size="sm">Demo Mode</MetrivaBadge>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                You are previewing synthetic e-commerce period comparisons (MoM, QoQ, YoY). Connect an external database to calculate period comparisons on your business data.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+            {onNavigateToDataSources && (
+              <MetrivaButton
+                onClick={onNavigateToDataSources}
+                size="sm"
+                variant="primary"
+                icon={<Database className="h-3.5 w-3.5" />}
+              >
+                Connect Database
+              </MetrivaButton>
+            )}
+            <MetrivaButton
+              onClick={() => {
+                setIsSampleMode(false);
+                fetchData(false);
+              }}
+              size="sm"
+              variant="secondary"
+              icon={<X className="h-3.5 w-3.5" />}
+            >
+              Exit Sample Mode
+            </MetrivaButton>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -153,7 +299,7 @@ export const PeriodComparisonView: React.FC = () => {
           </button>
 
           <button
-            onClick={fetchData}
+            onClick={() => fetchData()}
             disabled={loading}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 rounded-lg transition shadow-md shadow-cyan-500/20"
           >

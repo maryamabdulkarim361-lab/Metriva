@@ -5,12 +5,14 @@ import { MetrivaLogo, MetrivaButton, ThemeToggle } from "../ui";
 interface LandingNavbarProps {
   onLaunchApp: () => void;
   onOpenAuth?: () => void;
+  onLogout?: () => void;
   currentUser?: { name?: string; email?: string } | null;
 }
 
 export const LandingNavbar: React.FC<LandingNavbarProps> = ({
   onLaunchApp,
   onOpenAuth,
+  onLogout,
   currentUser,
 }) => {
   const [scrolled, setScrolled] = useState(false);
@@ -69,6 +71,16 @@ export const LandingNavbar: React.FC<LandingNavbarProps> = ({
               <span className="text-xs font-semibold text-cyan-600 dark:text-cyan-300 max-w-[120px] truncate">
                 {currentUser.name || currentUser.email}
               </span>
+              {onLogout && (
+                <button
+                  onClick={onLogout}
+                  className="text-xs text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 underline ml-1 cursor-pointer transition-colors"
+                  title="Sign out"
+                  aria-label="Sign out from landing page"
+                >
+                  Sign Out
+                </button>
+              )}
             </div>
           ) : onOpenAuth ? (
             <button

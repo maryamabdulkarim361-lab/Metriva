@@ -151,6 +151,37 @@ class WebsiteEventViewSet(viewsets.ReadOnlyModelViewSet):
         return api_response(data=serializer.data)
 
 
+def check_analytics_tenant_access(request):
+    """
+    Determines whether the requesting user's active organization has connected datasources,
+    explicitly requested sample demo data, or is the dedicated Metriva Demo Org.
+    Returns (is_empty_tenant, is_sample_view, has_connected_datasources, is_demo_org, org).
+    """
+    from apps.datasources.models import DataSource
+    from apps.organizations.service import resolve_tenant_context
+
+    org, role = resolve_tenant_context(request)
+    is_sample_requested = request.query_params.get("sample", "").lower() == "true"
+    if request.method == "POST":
+        is_sample_requested = is_sample_requested or str(request.data.get("sample", "")).lower() == "true"
+    is_demo_org = bool(org and org.slug == "metriva-demo-org")
+
+    has_connected_datasources = False
+    if org:
+        has_connected_datasources = DataSource.objects.filter(
+            organization=org, is_active=True
+        ).exists()
+
+    is_sample_view = is_sample_requested or is_demo_org or not has_connected_datasources
+    is_empty_tenant = (
+        request.user.is_authenticated
+        and not has_connected_datasources
+        and not is_sample_requested
+        and not is_demo_org
+    )
+    return is_empty_tenant, is_sample_view, has_connected_datasources, is_demo_org, org
+
+
 class DashboardSummaryView(APIView):
     """
     Main dashboard KPIs calculated live from PostgreSQL:
@@ -169,6 +200,33 @@ class DashboardSummaryView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def get(self, request):
+        (
+            is_empty_tenant,
+            is_sample_view,
+            has_connected_datasources,
+            is_demo_org,
+            org,
+        ) = check_analytics_tenant_access(request)
+
+        # For authenticated users whose active organization has zero connected datasources,
+        # render a clean onboarding empty state unless they explicitly explore the sample dashboard
+        if is_empty_tenant:
+            return api_response(
+                data={
+                    "has_connected_datasources": False,
+                    "is_sample_view": False,
+                    "organization_name": org.name if org else "Your Workspace",
+                    "kpis": None,
+                    "revenue_by_month": [],
+                    "revenue_by_country": [],
+                    "order_status_distribution": [],
+                    "customer_segmentation": [],
+                    "top_products": [],
+                    "top_customers": [],
+                    "is_synthetic_demo": False,
+                }
+            )
+
         total_customers = Customer.objects.count()
         total_orders = Order.objects.count()
 
@@ -267,10 +325,13 @@ class DashboardSummaryView(APIView):
 
         return api_response(
             data={
+                "has_connected_datasources": has_connected_datasources or not request.user.is_authenticated,
+                "is_sample_view": not has_connected_datasources or is_demo_org,
                 "is_synthetic_demo": True,
                 "demo_dataset_description": (
                     "Synthetic E-Commerce Benchmark Dataset (250 customers, 2,500 orders)"
                 ),
+                "organization_name": org.name if org else "Metriva Demo",
                 "kpis": {
                     "total_customers": total_customers,
                     "total_orders": total_orders,
@@ -294,6 +355,17 @@ class RevenueAnalyticsView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def get(self, request):
+        (
+            is_empty_tenant,
+            is_sample_view,
+            has_connected_datasources,
+            is_demo_org,
+            org,
+        ) = check_analytics_tenant_access(request)
+
+        if is_empty_tenant:
+            return api_response(data=[])
+
         monthly = list(
             Order.objects.filter(status="COMPLETED")
             .annotate(month=TruncMonth("order_date"))
@@ -323,6 +395,17 @@ class CustomerSegmentationAnalyticsView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def get(self, request):
+        (
+            is_empty_tenant,
+            is_sample_view,
+            has_connected_datasources,
+            is_demo_org,
+            org,
+        ) = check_analytics_tenant_access(request)
+
+        if is_empty_tenant:
+            return api_response(data=[])
+
         segments = list(
             Customer.objects.values("customer_segment")
             .annotate(
@@ -345,6 +428,17 @@ class ProductPerformanceAnalyticsView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def get(self, request):
+        (
+            is_empty_tenant,
+            is_sample_view,
+            has_connected_datasources,
+            is_demo_org,
+            org,
+        ) = check_analytics_tenant_access(request)
+
+        if is_empty_tenant:
+            return api_response(data=[])
+
         categories = list(
             Product.objects.values("category")
             .annotate(
@@ -400,12 +494,44 @@ class PeriodComparisonView(APIView):
         dimension = request.query_params.get("dimension")
         limit_periods = int(request.query_params.get("limit", 6))
 
+        (
+            is_empty_tenant,
+            is_sample_view,
+            has_connected_datasources,
+            is_demo_org,
+            org,
+        ) = check_analytics_tenant_access(request)
+
+        if is_empty_tenant:
+            return api_response(
+                data={
+                    "has_connected_datasources": False,
+                    "is_sample_view": False,
+                    "organization_name": org.name if org else "Your Workspace",
+                    "period_type": period_type.upper(),
+                    "period_label": f"{period_type.upper()} Comparison",
+                    "dimension": dimension or None,
+                    "periods_analyzed": 0,
+                    "data": [],
+                    "summary": {
+                        "observed_facts": [],
+                        "statistical_associations": [],
+                        "investigation_hypotheses": [],
+                    },
+                    "message": "Connect a database to compare your workspace's performance across time periods.",
+                }
+            )
+
         try:
             result = calculate_period_comparison(
                 period_type=period_type,
                 dimension=dimension,
                 limit_periods=limit_periods,
             )
+            result["has_connected_datasources"] = has_connected_datasources or not request.user.is_authenticated
+            result["is_sample_view"] = not has_connected_datasources or is_demo_org
+            result["is_synthetic_demo"] = True
+            result["organization_name"] = org.name if org else "Metriva Demo"
             return api_response(data=result)
         except Exception as exc:
             return api_error(
@@ -419,12 +545,44 @@ class PeriodComparisonView(APIView):
         dimension = request.data.get("dimension")
         limit_periods = int(request.data.get("limit", 6))
 
+        (
+            is_empty_tenant,
+            is_sample_view,
+            has_connected_datasources,
+            is_demo_org,
+            org,
+        ) = check_analytics_tenant_access(request)
+
+        if is_empty_tenant:
+            return api_response(
+                data={
+                    "has_connected_datasources": False,
+                    "is_sample_view": False,
+                    "organization_name": org.name if org else "Your Workspace",
+                    "period_type": period_type.upper(),
+                    "period_label": f"{period_type.upper()} Comparison",
+                    "dimension": dimension or None,
+                    "periods_analyzed": 0,
+                    "data": [],
+                    "summary": {
+                        "observed_facts": [],
+                        "statistical_associations": [],
+                        "investigation_hypotheses": [],
+                    },
+                    "message": "Connect a database to compare your workspace's performance across time periods.",
+                }
+            )
+
         try:
             result = calculate_period_comparison(
                 period_type=period_type,
                 dimension=dimension,
                 limit_periods=limit_periods,
             )
+            result["has_connected_datasources"] = has_connected_datasources or not request.user.is_authenticated
+            result["is_sample_view"] = not has_connected_datasources or is_demo_org
+            result["is_synthetic_demo"] = True
+            result["organization_name"] = org.name if org else "Metriva Demo"
             return api_response(data=result)
         except Exception as exc:
             return api_error(

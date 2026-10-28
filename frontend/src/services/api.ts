@@ -28,8 +28,10 @@ import {
 } from "../types";
 
 const BASE_URL = "/api";
-const TOKEN_KEY = "aidb_access_token";
-const ACTIVE_ORG_KEY = "aidb_active_org_id";
+export const TOKEN_KEY = "aidb_access_token";
+export const REFRESH_TOKEN_KEY = "aidb_refresh_token";
+export const ACTIVE_ORG_KEY = "aidb_active_org_id";
+export const DATASOURCE_KEY = "metriva_selected_datasource_id";
 
 export const getAuthToken = (): string | null => {
   try {
@@ -46,6 +48,28 @@ export const setAuthToken = (token: string | null): void => {
         localStorage.setItem(TOKEN_KEY, token);
       } else {
         localStorage.removeItem(TOKEN_KEY);
+      }
+    }
+  } catch {
+    // Ignore storage errors
+  }
+};
+
+export const getRefreshToken = (): string | null => {
+  try {
+    return typeof localStorage !== "undefined" ? localStorage.getItem(REFRESH_TOKEN_KEY) : null;
+  } catch {
+    return null;
+  }
+};
+
+export const setRefreshToken = (token: string | null): void => {
+  try {
+    if (typeof localStorage !== "undefined") {
+      if (token) {
+        localStorage.setItem(REFRESH_TOKEN_KEY, token);
+      } else {
+        localStorage.removeItem(REFRESH_TOKEN_KEY);
       }
     }
   } catch {
@@ -120,6 +144,13 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     (err as any).status = status;
     (err as any).code = json?.error?.code || `HTTP_${status}`;
     (err as any).details = json?.error?.details;
+
+    if (status === 401 && typeof window !== "undefined") {
+      setAuthToken(null);
+      setRefreshToken(null);
+      window.dispatchEvent(new CustomEvent("metriva:unauthorized"));
+    }
+
     throw err;
   }
 
@@ -156,6 +187,9 @@ export const api = {
     if (res?.tokens?.access) {
       setAuthToken(res.tokens.access);
     }
+    if (res?.tokens?.refresh) {
+      setRefreshToken(res.tokens.refresh);
+    }
     return res;
   },
 
@@ -169,17 +203,37 @@ export const api = {
 
   logout: (): void => {
     setAuthToken(null);
+    setRefreshToken(null);
     setActiveOrgId(null);
     if (typeof localStorage !== "undefined") {
-      localStorage.removeItem("metriva_selected_datasource_id");
+      try {
+        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem(REFRESH_TOKEN_KEY);
+        localStorage.removeItem(ACTIVE_ORG_KEY);
+        localStorage.removeItem(DATASOURCE_KEY);
+      } catch {
+        // Ignore storage errors
+      }
     }
   },
 
   // Dashboard & Metrics
-  getDashboardData: (): Promise<DashboardData> => request<DashboardData>("/dashboard/"),
-  getRevenueAnalytics: (): Promise<any[]> => request<any[]>("/analytics/revenue/"),
-  getCustomerSegments: (): Promise<any[]> => request<any[]>("/analytics/customers/"),
-  getProductPerformance: (): Promise<any[]> => request<any[]>("/analytics/products/"),
+  getDashboardData: (params?: { sample?: boolean }): Promise<DashboardData> => {
+    const qs = params?.sample ? "?sample=true" : "";
+    return request<DashboardData>(`/dashboard/${qs}`);
+  },
+  getRevenueAnalytics: (params?: { sample?: boolean }): Promise<any[]> => {
+    const qs = params?.sample ? "?sample=true" : "";
+    return request<any[]>(`/analytics/revenue/${qs}`);
+  },
+  getCustomerSegments: (params?: { sample?: boolean }): Promise<any[]> => {
+    const qs = params?.sample ? "?sample=true" : "";
+    return request<any[]>(`/analytics/customers/${qs}`);
+  },
+  getProductPerformance: (params?: { sample?: boolean }): Promise<any[]> => {
+    const qs = params?.sample ? "?sample=true" : "";
+    return request<any[]>(`/analytics/products/${qs}`);
+  },
 
   // AI Natural Language Query
   askQuestion: (
@@ -271,7 +325,16 @@ export const api = {
     }),
 
   // Schema Explorer
-  getSchemaMetadata: (): Promise<SchemaMetadata> => request<SchemaMetadata>("/schema/"),
+  getSchemaMetadata: (params?: {
+    dataSourceId?: number | null;
+    sample?: boolean;
+  }): Promise<SchemaMetadata> => {
+    const searchParams = new URLSearchParams();
+    if (params?.dataSourceId) searchParams.set("datasource_id", String(params.dataSourceId));
+    if (params?.sample) searchParams.set("sample", "true");
+    const qs = searchParams.toString();
+    return request<SchemaMetadata>(`/schema/${qs ? `?${qs}` : ""}`);
+  },
 
   // Business Metrics Layer
   getMetrics: (metricId?: string): Promise<MetricDefinition[] | MetricDefinition> => {
@@ -284,11 +347,13 @@ export const api = {
     period?: string;
     dimension?: string;
     limit?: number;
+    sample?: boolean;
   }): Promise<PeriodComparisonResult> => {
     const searchParams = new URLSearchParams();
     if (params?.period) searchParams.set("period", params.period);
     if (params?.dimension) searchParams.set("dimension", params.dimension);
     if (params?.limit) searchParams.set("limit", String(params.limit));
+    if (params?.sample) searchParams.set("sample", "true");
     const qs = searchParams.toString();
     return request<PeriodComparisonResult>(`/analytics/compare-periods/${qs ? `?${qs}` : ""}`);
   },
@@ -366,22 +431,44 @@ export const api = {
   getRevenueForecast: (params?: {
     aggregation?: string;
     horizon?: number;
+    sample?: boolean;
   }): Promise<MLForecastResult> => {
     const searchParams = new URLSearchParams();
     if (params?.aggregation) searchParams.set("aggregation", params.aggregation);
     if (params?.horizon) searchParams.set("horizon", String(params.horizon));
+    if (params?.sample) searchParams.set("sample", "true");
     const qs = searchParams.toString();
     return request<MLForecastResult>(`/ml/forecast/revenue/${qs ? `?${qs}` : ""}`);
   },
 
-  getCustomerChurn: (inactivityDays?: number): Promise<MLChurnResult> => {
-    const q = inactivityDays ? `?inactivity_days=${inactivityDays}` : "";
-    return request<MLChurnResult>(`/ml/churn/customers/${q}`);
+  getCustomerChurn: (params?: {
+    inactivityDays?: number;
+    sample?: boolean;
+  } | number): Promise<MLChurnResult> => {
+    const searchParams = new URLSearchParams();
+    if (typeof params === "number") {
+      searchParams.set("inactivity_days", String(params));
+    } else {
+      if (params?.inactivityDays) searchParams.set("inactivity_days", String(params.inactivityDays));
+      if (params?.sample) searchParams.set("sample", "true");
+    }
+    const qs = searchParams.toString();
+    return request<MLChurnResult>(`/ml/churn/customers/${qs ? `?${qs}` : ""}`);
   },
 
-  getAnomalyScan: (zThreshold?: number): Promise<MLAnomalyScanResult> => {
-    const q = zThreshold ? `?z_threshold=${zThreshold}` : "";
-    return request<MLAnomalyScanResult>(`/ml/anomalies/scan/${q}`);
+  getAnomalyScan: (params?: {
+    zThreshold?: number;
+    sample?: boolean;
+  } | number): Promise<MLAnomalyScanResult> => {
+    const searchParams = new URLSearchParams();
+    if (typeof params === "number") {
+      searchParams.set("z_threshold", String(params));
+    } else {
+      if (params?.zThreshold) searchParams.set("z_threshold", String(params.zThreshold));
+      if (params?.sample) searchParams.set("sample", "true");
+    }
+    const qs = searchParams.toString();
+    return request<MLAnomalyScanResult>(`/ml/anomalies/scan/${qs ? `?${qs}` : ""}`);
   },
 
   getAnomalyAlerts: (unacknowledged?: boolean): Promise<MLAnomalyAlert[]> => {
@@ -394,9 +481,19 @@ export const api = {
       method: "POST",
     }),
 
-  getMLInsights: (topic?: string): Promise<MLInsights> => {
-    const q = topic ? `?topic=${encodeURIComponent(topic)}` : "";
-    return request<MLInsights>(`/ml/insights/${q}`);
+  getMLInsights: (params?: {
+    topic?: string;
+    sample?: boolean;
+  } | string): Promise<MLInsights> => {
+    const searchParams = new URLSearchParams();
+    if (typeof params === "string") {
+      searchParams.set("topic", params);
+    } else {
+      if (params?.topic) searchParams.set("topic", params.topic);
+      if (params?.sample) searchParams.set("sample", "true");
+    }
+    const qs = searchParams.toString();
+    return request<MLInsights>(`/ml/insights/${qs ? `?${qs}` : ""}`);
   },
 
   getMLModels: (): Promise<MLModel[]> => request<MLModel[]>("/ml/models/"),

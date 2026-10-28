@@ -108,5 +108,68 @@ describe("DashboardView Component", () => {
 
     expect(onNavigateToQuery).toHaveBeenCalledWith("Show the top 10 customers by revenue.");
   });
+
+  it("renders onboarding empty state when workspace has zero connected datasources", () => {
+    const onNavigateToDataSources = vi.fn();
+    const onExploreSample = vi.fn();
+
+    render(
+      <DashboardView
+        data={{
+          ...mockDashboardData,
+          has_connected_datasources: false,
+          is_sample_view: false,
+          kpis: null,
+          organization_name: "Faisal's Workspace",
+        }}
+        loading={false}
+        onNavigateToQuery={vi.fn()}
+        onNavigateToDataSources={onNavigateToDataSources}
+        onExploreSample={onExploreSample}
+        isExploringSample={false}
+      />
+    );
+
+    expect(
+      screen.getByText("Connect Your Database to Unlock Analytics")
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Faisal's Workspace/)).toBeInTheDocument();
+
+    const connectBtn = screen.getByRole("button", { name: /connect database/i });
+    expect(connectBtn).toBeInTheDocument();
+    fireEvent.click(connectBtn);
+    expect(onNavigateToDataSources).toHaveBeenCalledTimes(1);
+
+    const exploreBtn = screen.getByRole("button", { name: /explore sample dashboard/i });
+    expect(exploreBtn).toBeInTheDocument();
+    fireEvent.click(exploreBtn);
+    expect(onExploreSample).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders sample mode banner when isExploringSample is active", () => {
+    const onExitSample = vi.fn();
+    render(
+      <DashboardView
+        data={{
+          ...mockDashboardData,
+          has_connected_datasources: false,
+          is_sample_view: true,
+        }}
+        loading={false}
+        onNavigateToQuery={vi.fn()}
+        onExitSample={onExitSample}
+        isExploringSample={true}
+      />
+    );
+
+    expect(
+      screen.getByText("Sample Demonstration Mode Active")
+    ).toBeInTheDocument();
+
+    const exitBtn = screen.getByRole("button", { name: /exit sample mode/i });
+    expect(exitBtn).toBeInTheDocument();
+    fireEvent.click(exitBtn);
+    expect(onExitSample).toHaveBeenCalledTimes(1);
+  });
 });
 
